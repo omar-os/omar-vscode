@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      # Tests that need the compiler skip themselves without it; this job runs
+      # the rest, which is everything that does not depend on a Lean toolchain.
+      - run: node --test test/*.test.mjs
+
+  # The compiler is a Lean build, so the tests that use it run apart from the
+  # ones that do not. Without this the parsing of its errors is only ever
+  # checked against strings written here, which is not the same as checking it
+  # against the compiler.
+  against-omarc:
+    name: Against the real compiler
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: omar-os/omar
+          path: omar-runtime
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: omar-runtime/lang
+          build: true
+          build-args: omarc
+          test: false
+      - run: npm ci
+      - run: npm run build
+      - run: node --test test/*.test.mjs
+        env:
+          OMARC_BIN: ${{ github.workspace }}/omar-runtime/lang/.lake/build/bin/omarc

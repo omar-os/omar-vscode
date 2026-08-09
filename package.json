@@ -1,0 +1,102 @@
+{
+  "name": "omar-vscode",
+  "displayName": "OMAR",
+  "description": "Syntax highlighting, compilation, and a live topology diagram for the OMAR language.",
+  "version": "0.1.0",
+  "license": "BSD-3-Clause",
+  "publisher": "omar-os",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omar-os/omar-vscode.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=20"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "omar",
+        "aliases": [
+          "OMAR",
+          "omar"
+        ],
+        "extensions": [
+          ".omar"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "omar",
+        "scopeName": "source.omar",
+        "path": "./syntaxes/omar.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "omar.compile",
+        "title": "OMAR: Compile to bytecode",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "omar.showDiagram",
+        "title": "OMAR: Show topology diagram",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "omar.showDiagram",
+          "when": "resourceLangId == omar",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "OMAR",
+      "properties": {
+        "omar.compilerPath": {
+          "type": "string",
+          "default": "omarc",
+          "description": "Path to the omarc binary. Resolved on PATH when it is a bare name."
+        },
+        "omar.diagramServerUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Address of a running diagram server, for example http://127.0.0.1:7341. When set, the diagram follows the run rather than showing the compiled topology alone."
+        },
+        "omar.compileOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Compile a .omar file when it is saved, to report errors as diagnostics."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "lint": "eslint src test",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.9.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.66.0"
+  }
+}

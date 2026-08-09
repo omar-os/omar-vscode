@@ -1,0 +1,40 @@
+// A program the extension can be tried on: open it, run
+// "OMAR: Show topology diagram", and edit it to watch the drawing follow.
+
+team Stage(role : string)[worker : Codex]
+{
+    input brief : string
+    output finding : string
+
+    prompt worker(brief) -> finding
+    "
+        You are the $(role) stage. The brief you were handed: $(brief)
+        Set `finding` to at most 60 words.
+    "
+}
+
+team Review[editor : Codex]
+{
+    input request : string
+    output verdict : string
+
+    // A team may instantiate teams of its own, and the containers nest.
+    evidence = Stage("evidence");
+    risk = Stage("risk");
+
+    request -> evidence.brief
+    request -> risk.brief
+
+    // A reaction may read a contained instance's output. That is how a team
+    // observes what it contains.
+    prompt editor(evidence.finding, risk.finding) -> verdict
+    "
+        Evidence: $(evidence.finding)
+        Risk: $(risk.finding)
+        Set `verdict` to at most 80 words.
+    "
+}
+
+main Review {
+    review = Review()
+}

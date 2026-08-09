@@ -1,0 +1,214 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "OMAR",
+  "scopeName": "source.omar",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#team" },
+    { "include": "#main" },
+    { "include": "#declaration" },
+    { "include": "#prompt" },
+    { "include": "#connection" },
+    { "include": "#instantiation" },
+    { "include": "#string" },
+    { "include": "#number" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "name": "comment.line.double-slash.omar", "match": "//.*$" },
+        {
+          "name": "comment.block.omar",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
+      ]
+    },
+
+    "team": {
+      "comment": "team Name(params)[agent : Backend, ...]",
+      "begin": "\\b(team)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.team.omar" },
+        "2": { "name": "entity.name.type.team.omar" }
+      },
+      "end": "(?=\\{)",
+      "patterns": [
+        { "include": "#comment" },
+        { "include": "#agentBinding" },
+        { "include": "#parameter" },
+        { "include": "#type" },
+        { "name": "punctuation.separator.omar", "match": "[,:()\\[\\]]" }
+      ]
+    },
+
+    "agentBinding": {
+      "comment": "Inside brackets: worker : ClaudeCode",
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.section.brackets.begin.omar" } },
+      "end": "\\]",
+      "endCaptures": { "0": { "name": "punctuation.section.brackets.end.omar" } },
+      "patterns": [
+        { "include": "#comment" },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*\\b(Claude|ClaudeCode|Codex|Cursor|OpenCode|Agy|Stub)\\b",
+          "captures": {
+            "1": { "name": "variable.other.agent.omar" },
+            "2": { "name": "punctuation.separator.omar" },
+            "3": { "name": "support.class.backend.omar" }
+          }
+        },
+        {
+          "comment": "A backend the runtime will not resolve is still a name, not a mistake to colour as one.",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "variable.other.agent.omar" },
+            "2": { "name": "punctuation.separator.omar" },
+            "3": { "name": "entity.name.type.backend.omar" }
+          }
+        }
+      ]
+    },
+
+    "parameter": {
+      "comment": "Compile-time parameters: (role : string)",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(:)\\s*(?=(bool|int|float|string|path|bytes|signal|list|option)\\b)",
+      "captures": {
+        "1": { "name": "variable.parameter.omar" },
+        "2": { "name": "punctuation.separator.omar" }
+      }
+    },
+
+    "main": {
+      "comment": "main Name { ... }. The name identifies the run.",
+      "match": "\\b(main)\\b(?:\\s+([A-Za-z_][A-Za-z0-9_]*))?",
+      "captures": {
+        "1": { "name": "keyword.control.main.omar" },
+        "2": { "name": "entity.name.type.main.omar" }
+      }
+    },
+
+    "declaration": {
+      "patterns": [
+        {
+          "comment": "input a : string / output b : int",
+          "match": "\\b(input|output)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(:)",
+          "captures": {
+            "1": { "name": "storage.type.port.omar" },
+            "2": { "name": "variable.other.port.omar" },
+            "3": { "name": "punctuation.separator.omar" }
+          }
+        },
+        {
+          "comment": "action a(delay=2) : int, or an untyped signal",
+          "match": "\\b(action)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.action.omar" },
+            "2": { "name": "variable.other.port.omar" }
+          }
+        },
+        {
+          "comment": "timer t(offset, period): a trigger the runtime fires from its own clock",
+          "match": "\\b(timer)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.timer.omar" },
+            "2": { "name": "variable.other.timer.omar" }
+          }
+        },
+        {
+          "match": "\\b(delay)\\s*(=)",
+          "captures": {
+            "1": { "name": "variable.parameter.delay.omar" },
+            "2": { "name": "keyword.operator.assignment.omar" }
+          }
+        },
+        { "include": "#type" }
+      ]
+    },
+
+    "type": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.omar",
+          "match": "\\b(bool|int|float|string|path|bytes|signal)\\b"
+        },
+        {
+          "name": "support.type.container.omar",
+          "match": "\\b(list|option)\\b(?=\\s*<)"
+        }
+      ]
+    },
+
+    "prompt": {
+      "comment": "prompt agent(triggers) -> effects \"body\"",
+      "begin": "\\b(prompt)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(\\()",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.prompt.omar" },
+        "2": { "name": "entity.name.function.agent.omar" },
+        "3": { "name": "punctuation.section.parens.begin.omar" }
+      },
+      "end": "(?=\")",
+      "patterns": [
+        { "include": "#comment" },
+        { "name": "keyword.operator.produces.omar", "match": "->" },
+        {
+          "comment": "A contained instance's output, read by the team that instantiated it.",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\.([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "variable.other.instance.omar" },
+            "2": { "name": "variable.other.port.omar" }
+          }
+        },
+        { "name": "variable.other.port.omar", "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+        { "name": "keyword.operator.alternative.omar", "match": "[|?]" },
+        { "name": "punctuation.separator.omar", "match": "[(),]" }
+      ]
+    },
+
+    "connection": {
+      "comment": "a -> b, or a -> b after 3",
+      "match": "([A-Za-z_][A-Za-z0-9_.]*)\\s*(->)\\s*([A-Za-z_][A-Za-z0-9_.]*)(?:\\s+(after)\\s+([0-9]+))?",
+      "captures": {
+        "1": { "name": "variable.other.port.omar" },
+        "2": { "name": "keyword.operator.connection.omar" },
+        "3": { "name": "variable.other.port.omar" },
+        "4": { "name": "keyword.control.after.omar" },
+        "5": { "name": "constant.numeric.omar" }
+      }
+    },
+
+    "instantiation": {
+      "comment": "name = Team(args); a team may instantiate teams of its own",
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(=)\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "variable.other.instance.omar" },
+        "2": { "name": "keyword.operator.assignment.omar" },
+        "3": { "name": "entity.name.type.team.omar" }
+      }
+    },
+
+    "string": {
+      "comment": "Prompt bodies. `$(port)` reads a trigger value at run time.",
+      "name": "string.quoted.double.omar",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "meta.interpolation.omar",
+          "match": "(\\$\\()\\s*([A-Za-z_][A-Za-z0-9_.]*)\\s*(\\))",
+          "captures": {
+            "1": { "name": "punctuation.definition.interpolation.begin.omar" },
+            "2": { "name": "variable.other.port.omar" },
+            "3": { "name": "punctuation.definition.interpolation.end.omar" }
+          }
+        },
+        { "name": "constant.character.escape.omar", "match": "\\\\." }
+      ]
+    },
+
+    "number": {
+      "name": "constant.numeric.omar",
+      "match": "\\b[0-9]+\\b"
+    }
+  }
+}
