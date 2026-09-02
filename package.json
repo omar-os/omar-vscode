@@ -88,6 +88,21 @@
         "command": "omar.revealArtifacts",
         "title": "OMAR: Reveal Deployment Files",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "omar.showOnTopology",
+        "title": "OMAR: Show on Topology",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "omar.clearHighlight",
+        "title": "OMAR: Clear Topology Highlight",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "omar.openEvidence",
+        "title": "OMAR: Open Evidence",
+        "icon": "$(go-to-file)"
       }
     ],
     "menus": {
@@ -123,6 +138,11 @@
           "command": "omar.revealArtifacts",
           "when": "view == omar.artifacts && omar.hasSelection",
           "group": "navigation"
+        },
+        {
+          "command": "omar.clearHighlight",
+          "when": "view == omar.guarantees",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -133,6 +153,26 @@
         {
           "command": "omar.showMenu",
           "when": "false"
+        },
+        {
+          "command": "omar.showOnTopology",
+          "when": "false"
+        },
+        {
+          "command": "omar.openEvidence",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "omar.showOnTopology",
+          "when": "view == omar.guarantees && viewItem =~ /^guarantee/",
+          "group": "inline@1"
+        },
+        {
+          "command": "omar.openEvidence",
+          "when": "view == omar.guarantees && viewItem == guarantee.evidence",
+          "group": "inline@2"
         }
       ]
     },
@@ -202,6 +242,16 @@
           "id": "omar.artifacts",
           "name": "Artifacts",
           "icon": "media/omar.svg"
+        },
+        {
+          "id": "omar.guarantees",
+          "name": "Guarantees",
+          "icon": "media/omar.svg"
+        },
+        {
+          "id": "omar.events",
+          "name": "Events",
+          "icon": "media/omar.svg"
         }
       ]
     },
@@ -243,6 +293,16 @@
       },
       {
         "view": "omar.artifacts",
+        "contents": "No deployment selected.",
+        "when": "!omar.hasSelection"
+      },
+      {
+        "view": "omar.guarantees",
+        "contents": "No deployment selected.",
+        "when": "!omar.hasSelection"
+      },
+      {
+        "view": "omar.events",
         "contents": "No deployment selected.",
         "when": "!omar.hasSelection"
       }

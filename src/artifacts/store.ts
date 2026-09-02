@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { DiagramSnapshot, RunRecord } from "../client/protocol";
 
 /**
@@ -41,6 +43,13 @@ export type ArtifactGroup = { label: string; artifacts: Artifact[] };
 export type ArtifactListing = {
   /** The topology directory, when it exists. */
   directory: string | null;
+  /**
+   * The program's revision: the first seven hex digits of the SHA-256 of its
+   * source as submitted. Nothing more is available — the daemon keeps no
+   * history — and it is enough to tell one revision from another, which is
+   * what a proof must be scoped to.
+   */
+  revision: string | null;
   groups: ArtifactGroup[];
   /** Something the reader must know before trusting the list. */
   caveat: string | null;
@@ -102,11 +111,13 @@ export async function listArtifacts(
 
   const program = await describe(programPath(dataDir, ea, run.run_id), "program.omar", "program", null);
   if (program) groups.push({ label: "Program", artifacts: [program] });
+  const source = program ? await files.readFile(program.path) : null;
+  const revision = source === null ? null : revisionOf(source);
 
   const directory = topologyDir(dataDir, ea, run.team);
   const record = await files.readFile(join(directory, "deployment.json"));
   if (record === null) {
-    return { directory: null, groups, caveat: groups.length === 0 ? "The runtime has written nothing for this run yet." : null };
+    return { directory: null, revision, groups, caveat: groups.length === 0 ? "The runtime has written nothing for this run yet." : null };
   }
   try {
     const parsed = JSON.parse(record) as { started_at?: number };
@@ -150,5 +161,9 @@ export async function listArtifacts(
   instructions.sort((a, b) => a.name.localeCompare(b.name));
   if (instructions.length > 0) groups.push({ label: "Agent instructions", artifacts: instructions });
 
-  return { directory, groups, caveat };
+  return { directory, revision, groups, caveat };
+}
+
+export function revisionOf(source: string): string {
+  return createHash("sha256").update(source).digest("hex").slice(0, 7);
 }

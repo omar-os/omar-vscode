@@ -21,7 +21,7 @@ async function run() {
   const extension = vscode.extensions.getExtension("omar-os.omar-vscode");
   assert.ok(extension, "the extension is installed in the test host");
   const api = await extension.activate();
-  const { session, selection, panel, artifacts } = api;
+  const { session, selection, panel, artifacts, guarantees } = api;
 
   // A data directory shaped like the runtime's, so the artifacts view has
   // something real to list and open.
@@ -70,10 +70,27 @@ async function run() {
     assert.equal(selection.current, "reaction::watch.reaction.0");
     assert.equal(panel.state().selected, "reaction::watch.reaction.0");
 
+    // Guarantees: precise statuses, nothing proven, and one inspects like a node.
+    const listed = guarantees.current();
+    assert.ok(listed.length >= 5);
+    assert.equal(listed.filter((guarantee) => guarantee.status === "proven").length, 0);
+    assert.ok(listed.some((guarantee) => guarantee.status === "enforced"));
+    assert.ok(listed.some((guarantee) => guarantee.status === "unchecked"));
+    await vscode.commands.executeCommand("omar.inspect", "guarantee:declared-effects");
+    assert.equal(selection.current, "guarantee:declared-effects");
+    await vscode.commands.executeCommand("omar.showOnTopology", guarantees.find("declared-effects"));
+    assert.equal(panel.state().highlight.length, 4, "every reaction is brought forward");
+    await vscode.commands.executeCommand("omar.clearHighlight");
+    assert.equal(panel.state().highlight.length, 0);
+
+    // Events: the streamed transition is in the log.
+    assert.ok(session.current.live.log.some((entry) => entry.kind === "event" && entry.event.kind === "reaction_started"));
+
     // The artifacts view lists what the run wrote and opens it natively.
     await until(() => artifacts.current?.groups.length === 3, "the artifacts to be listed");
     const log = artifacts.current.groups.find((group) => group.label === "Agent logs").artifacts[0];
     assert.equal(log.producer, "agent::watch.agent");
+    assert.match(artifacts.current.revision, /^[0-9a-f]{7}$/, "the program has a revision");
     const item = artifacts.getTreeItem({ kind: "artifact", artifact: log });
     await vscode.commands.executeCommand(item.command.command, ...item.command.arguments);
     await until(() => vscode.window.activeTextEditor?.document.uri.fsPath === log.path, "the log to open in an editor");

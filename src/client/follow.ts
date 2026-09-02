@@ -18,6 +18,11 @@ import {
  */
 export type Connection = "connecting" | "live" | "stale" | "final";
 
+/** One thing that happened, as the follower saw it. */
+export type LogEntry =
+  | { at: number; kind: "event"; event: DiagramEvent }
+  | { at: number; kind: "note"; text: string };
+
 export type LiveRun = {
   record: RunRecord;
   snapshot: DiagramSnapshot | null;
@@ -26,7 +31,15 @@ export type LiveRun = {
   sequence: number;
   /** Why the connection is what it is, for a reader. */
   detail: string | null;
+  /**
+   * Every event applied, oldest first, with notes where the stream broke or
+   * a gap was filled from a snapshot. The runtime does not replay, so this is
+   * the only record of what was seen; it is bounded, and says when it was cut.
+   */
+  log: LogEntry[];
 };
+
+const LOG_LIMIT = 2000;
 
 /** How a follower reaches the runtime; the client in practice, a fake in tests. */
 export type RunSource = {
@@ -65,10 +78,15 @@ export async function followRun(
   const retryMs = options.retryMs ?? 1000;
   const maxRetries = options.maxRetries ?? 0;
   const settleMs = options.settleMs ?? 300;
-  let state: LiveRun = { record, snapshot: null, connection: "connecting", sequence: 0, detail: null };
+  let state: LiveRun = { record, snapshot: null, connection: "connecting", sequence: 0, detail: null, log: [] };
   const emit = (change: Partial<LiveRun>) => {
     state = { ...state, ...change };
     options.onChange(state);
+  };
+  const logged = (entry: LogEntry): LogEntry[] => {
+    const log = [...state.log, entry];
+    if (log.length <= LOG_LIMIT) return log;
+    return [{ at: log[0]!.at, kind: "note", text: `${log.length - LOG_LIMIT + 1} earlier entries dropped.` }, ...log.slice(-(LOG_LIMIT - 1))];
   };
 
   if (isRunFinished(record.status)) {
@@ -91,7 +109,12 @@ export async function followRun(
           // which is at least this event's; if the event is newer than the
           // snapshot it will show up in the next one, not be lost.
           const fresh = await source.snapshot(signal);
-          emit({ snapshot: fresh, sequence: Math.max(fresh.sequence, state.sequence), connection: "live" });
+          emit({
+            snapshot: fresh,
+            sequence: Math.max(fresh.sequence, state.sequence),
+            connection: "live",
+            log: logged({ at: Date.now(), kind: "note", text: `Events ${state.sequence + 1}–${event.sequence - 1} were missed; the picture was re-fetched.` }),
+          });
           if (event.sequence <= state.sequence) continue;
         }
         const snapshotNow = state.snapshot ?? snapshot;
@@ -100,6 +123,7 @@ export async function followRun(
           sequence: event.sequence,
           connection: "live",
           detail: null,
+          log: logged({ at: Date.now(), kind: "event", event }),
         });
         if (event.kind === "run_completed" || event.kind === "run_failed") {
           await settle(state, source, emit, signal, { ended: true, settleMs });
@@ -115,6 +139,7 @@ export async function followRun(
       if (signal.aborted) break;
       failures += 1;
       const detail = cause instanceof Error ? cause.message : String(cause);
+      emit({ log: logged({ at: Date.now(), kind: "note", text: `Connection lost: ${detail}` }) });
       const outcome = await settleOrStale(source, emit, signal, detail);
       if (outcome === "final") return state;
       if (maxRetries > 0 && failures >= maxRetries) return state;

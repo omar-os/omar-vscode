@@ -69,6 +69,37 @@ came from. The topology directory is per team, so a rerun overwrites it; the
 view says so when the directory's record is newer than the run shown. Files
 open with `vscode.open`, never a viewer of the extension's own.
 
+## Guarantees (`src/model/guarantees.ts`)
+
+The runtime does not publish guarantees, so the Guarantees view shows a
+catalogue of what protocol-1 runtime semantics establish, each entry naming
+the mechanism and the parts of the picture it covers, and a footnote says so.
+Statuses are kept apart: **ENFORCED** (the runtime prevents violation),
+**MONITORED** (it detects and reports), **UNCHECKED** (nothing establishes it).
+Nothing is **PROVEN**, because nothing is.
+
+| Guarantee | Status | Mechanism |
+| --- | --- | --- |
+| Connections are typed | ENFORCED | `verify()` at admission |
+| No instantaneous cycle | ENFORCED | `reject_causality_loops()` at admission |
+| Agents write only declared effects | ENFORCED | `omar_set_port` refuses others |
+| Effect contracts are honoured | ENFORCED | `validate_contract()` at completion |
+| Deadlines are kept | MONITORED | `expired()`; the runtime cannot make an agent answer |
+| Teams are isolated | UNCHECKED | shared working directory, permission checks off |
+| The run terminates | UNCHECKED | nothing checks |
+
+The shapes are the ones a runtime-supplied list would have: `evidence` may
+be a `lean-proof` with a `workflowRevision`, and `withRevision` marks such a
+guarantee **STALE** when the program's revision (SHA-256 of the source, first
+seven digits, shown in the Deployment view) differs. "Show on topology"
+brings a guarantee's subjects forward and dims the rest.
+
+## Events
+
+The follower keeps every event it applied, with a note where the stream broke
+or a gap was filled from a snapshot. The Events view lists them newest
+first; a reaction's event inspects the reaction.
+
 ## What the runtime does not expose yet
 
 Kept out of the UI rather than faked:
@@ -77,7 +108,7 @@ Kept out of the UI rather than faked:
 - approvals;
 - sandboxes (agents share the daemon's working directory);
 - a read-only or permission mode (the API has no auth surface);
-- guarantees as a first-class list;
+- guarantees as a first-class list (the view shows a catalogue, and says so);
 - proofs (the Lean code is the compiler, not theorems).
 
 Where the extension shows any of these it says what it does not know.

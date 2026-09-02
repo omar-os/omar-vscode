@@ -9,7 +9,16 @@ import { activityOf } from "./deployment";
  * row, rather than a row saying something made up; the one exception is
  * `value`, where "none" is itself a fact the runtime states.
  */
-export type Row = { label: string; value: string; /** An id the row points at, if any. */ ref?: string };
+export type Row = {
+  label: string;
+  value: string;
+  /** An id in the picture the row points at, if any. */
+  ref?: string;
+  /** A file the row opens, if any. */
+  open?: string;
+  /** Ids the row brings forward on the topology, if any. */
+  highlight?: string[];
+};
 
 export type Inspection = {
   id: string;
