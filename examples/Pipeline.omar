@@ -1,0 +1,38 @@
+// A program to watch run: four Stub agents, no model needed, with real delays
+// so the picture changes while you look. Start it through omar serve (see
+// docs/mission-control.md) with input first.inp=1.
+
+team Step[agent : Stub]
+{
+    input inp : int
+    output out : int
+
+    prompt agent(inp) -> out
+    "
+        Set `out` to $(inp) plus 1.
+    "
+}
+
+team Judge[agent : Stub]
+{
+    input left : int
+    input right : int
+    output verdict : int
+
+    prompt agent(left, right) -> verdict
+    "
+        Set `verdict` to $(left) plus $(right).
+    "
+}
+
+main Pipeline {
+    first = Step()
+    second = Step()
+    third = Step()
+    judge = Judge()
+
+    first.out -> second.inp after 4s
+    first.out -> third.inp after 8s
+    second.out -> judge.left
+    third.out -> judge.right
+}
