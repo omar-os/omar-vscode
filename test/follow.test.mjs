@@ -48,8 +48,9 @@ function fakeRuntime({ cutAt = Infinity, total = 8 } = {}) {
         }
         return snapshot;
       },
-      async *events() {
+      async *events(signal, onOpen) {
         runtime.streamOpens += 1;
+        onOpen?.();
         // Everything already reached is not replayed: the stream carries only
         // what happens after it was opened.
         const from = runtime.reached;
@@ -81,6 +82,10 @@ describe("following a run", () => {
     assert.equal(final.snapshot.status, "completed");
     assert.ok(seen.some((state) => state.connection === "live"), "was live at some point");
     assert.equal(seen[0].connection, "connecting");
+    // Live from the moment the stream is open, before any event: a run
+    // waiting out a delay is current, not connecting.
+    const firstLive = seen.findIndex((state) => state.connection === "live");
+    assert.ok(firstLive >= 0 && seen[firstLive].sequence === seen[firstLive - 1].sequence, "live before the first event was applied");
   });
 
   test("reconciles after a disconnect without repeating or inventing a transition", async () => {
