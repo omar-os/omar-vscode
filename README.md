@@ -40,8 +40,8 @@ what it is running:
   where the stream broke.
 
 Controls are the runtime's own: **Run Program** starts the open `.omar` file
-through the daemon (asking for each open input); **Stop** and **Kill** go
-through the `omar` CLI. Pause, resume and approvals are not offered, because
+through the daemon (asking for each open input); **Stop** goes through the
+`omar` CLI. Pause, resume and approvals are not offered, because
 the runtime has no such operation. Nothing is cached across a fetch and
 nothing is invented: the extension shows what the runtime says, and says what
 it does not know.
@@ -92,7 +92,7 @@ only, without a daemon.
 | --- | --- | --- |
 | `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens, as the extension host sees it. |
 | `omar.dataDir` | `~/.omar` | The runtime's data directory on the extension host; artifacts are read from it. |
-| `omar.cliPath` | `omar` | Used to stop or kill a deployment. |
+| `omar.cliPath` | `omar` | Used to stop a deployment. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name. |
 | `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`, for the per-file diagram. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |

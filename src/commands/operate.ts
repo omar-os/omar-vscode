@@ -80,32 +80,34 @@ async function askInputs(openInputs: string[], preview: DiagramSnapshot): Promis
   return inputs;
 }
 
-/** `omar stop <team>` or `omar kill <team>`, with the CLI's own words on failure. */
-export async function stopDeployment(session: RuntimeSession, cliPath: string, force: boolean): Promise<void> {
+/**
+ * `omar stop <team>`, with the CLI's own words on failure.
+ *
+ * Not `omar kill`: for a run started through the daemon the recorded runner
+ * pid is the daemon's own, so a kill takes the daemon down with the run.
+ */
+export async function stopDeployment(session: RuntimeSession, cliPath: string): Promise<void> {
   const run = session.selectedRun;
   if (!run) {
     vscode.window.showWarningMessage("No deployment selected.");
     return;
   }
-  const verb = force ? "Kill" : "Stop";
   const confirmed = await vscode.window.showWarningMessage(
-    force
-      ? `Kill ${run.team}? The runner is killed outright and the deployment is recorded as CANCELLED.`
-      : `Stop ${run.team}? The current tag closes, state and logs are persisted, and the sessions are cleaned up.`,
+    `Stop ${run.team}? The current tag closes, state and logs are persisted, and the sessions are cleaned up.`,
     { modal: true },
-    verb,
+    "Stop",
   );
-  if (confirmed !== verb) return;
+  if (confirmed !== "Stop") return;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `OMAR: ${verb.toLowerCase()}ping ${run.team}…` },
+    { location: vscode.ProgressLocation.Notification, title: `OMAR: stopping ${run.team}…` },
     () =>
       new Promise<void>((resolve) => {
-        execFile(cliPath, [force ? "kill" : "stop", run.team], { timeout: 600_000 }, (error, stdout, stderr) => {
+        execFile(cliPath, ["stop", run.team], { timeout: 600_000 }, (error, stdout, stderr) => {
           if (error) {
-            vscode.window.showErrorMessage(`omar ${force ? "kill" : "stop"} failed: ${stderr.trim() || error.message}`);
+            vscode.window.showErrorMessage(`omar stop failed: ${stderr.trim() || error.message}`);
           } else {
-            vscode.window.showInformationMessage(stdout.trim().split("\n").pop() ?? `${run.team} ${force ? "killed" : "stopped"}.`);
+            vscode.window.showInformationMessage(stdout.trim().split("\n").pop() ?? `${run.team} stopped.`);
           }
           void session.refresh();
           resolve();

@@ -73,6 +73,8 @@ describe("arranging a run for reading", () => {
     const record = { started_at: 100, finished_at: 160 };
     assert.equal(elapsedOf(record, 1000), 60);
     assert.equal(elapsedOf({ started_at: 100, finished_at: null }, 130), 30);
+    // No start time, no elapsed: the formatter turns NaN into a dash.
+    assert.ok(Number.isNaN(elapsedOf({ started_at: 0, finished_at: null }, 130)));
   });
 });
 

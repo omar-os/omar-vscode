@@ -126,6 +126,9 @@ export function statusOf(record: RunRecord, live: LiveRun | null): DeploymentSta
 
 /** Seconds the run has been going, or took. */
 export function elapsedOf(record: RunRecord, nowSeconds: number): number {
+  // A diagram-only connection has no daemon record and so no start time; an
+  // elapsed time measured from the epoch would be a lie.
+  if (!record.started_at) return Number.NaN;
   const end = record.finished_at ?? nowSeconds;
   return Math.max(0, end - record.started_at);
 }
