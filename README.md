@@ -1,9 +1,74 @@
 # OMAR for VS Code
 
-Syntax highlighting, compilation, and a topology diagram for the
-[OMAR](https://github.com/omar-os/omar) language.
+Language support and **Mission Control** for the
+[OMAR](https://github.com/omar-os/omar) runtime: syntax highlighting,
+compilation, and a live, inspectable picture of what a deployment is doing.
 
-## What it does
+![Mission Control: deployments, a live topology, teams, an inspector, and artifacts](docs/images/mission-control.png)
+
+## Mission Control
+
+Open the OMAR activity bar with an `omar serve` daemon running and you see
+what it is running:
+
+- **Deployments** — every run the daemon has started, its status and elapsed
+  time. The newest is selected on its own; a run you start is selected as it
+  starts.
+- **Deployment** — status, team, revision, timing, the counts, logical time,
+  lag, guarantees at a glance, and whether the picture is **LIVE**, **STALE**
+  (the event stream broke; what is shown is what was last known) or
+  **FINAL**.
+- **Mission Control** panel — the topology as the runtime describes it:
+  instances as nested boxes, ports, timers and reactions inside them, edges
+  between them, each reaction carrying its state as it changes. Pan, zoom,
+  click anything to inspect it.
+- **Teams** — instances, their agents, and each agent's reactions with their
+  real states.
+- **Inspector** — what the runtime knows about the selected thing: a
+  reaction's status, agent, triggers and effects with their values; a port's
+  value and when it was written; a guarantee's status, mechanism and evidence.
+- **Guarantees** — what holds for this run, with the status kept exact:
+  **ENFORCED** (the runtime prevents violation), **MONITORED** (it detects and
+  reports), **UNCHECKED** (nothing establishes it). Nothing is marked
+  **PROVEN**, because nothing is. *Show on topology* brings a guarantee's
+  subjects forward.
+- **Artifacts** — what the run wrote: the program as submitted, outputs,
+  state, each agent's log and instructions. Each opens as an ordinary VS Code
+  document.
+- **Events** — every event the follower applied, newest first, with notes
+  where the stream broke.
+
+Controls are the runtime's own: **Run Program** starts the open `.omar` file
+through the daemon (asking for each open input); **Stop** and **Kill** go
+through the `omar` CLI. Pause, resume and approvals are not offered, because
+the runtime has no such operation. Nothing is cached across a fetch and
+nothing is invented: the extension shows what the runtime says, and says what
+it does not know.
+
+### Try it
+
+```bash
+# In the omar repository, with omarc built (see its README):
+OMARC_BIN=$PWD/lang/.lake/build/bin/omarc omar serve --no-ea
+```
+
+Then in VS Code open `examples/Pipeline.omar`, run **OMAR: Run Program**
+(input `first.inp` = `1`, real time), and watch the four stages go idle →
+running → completed over about eight seconds in the panel, the Teams view
+and the status bar. Click a stage to inspect it; open its log under
+Artifacts when the run is over.
+
+### Remote SSH
+
+The extension is a workspace extension: under Remote SSH it runs on the
+remote host, next to the daemon, and reads the daemon's data directory from
+there. Point `omar.runtimeUrl` at the daemon as the remote sees it (the
+default, `http://127.0.0.1:7340`, is right when they share a machine) and
+artifacts open through VS Code's own remote file access. See
+[docs/mission-control.md](docs/mission-control.md) for what the runtime
+exposes, what it does not, and how the extension is put together.
+
+## Language support
 
 **Highlights `.omar` files.** Teams and their agents, ports and timers, prompt
 triggers and effects, connections and their delays, `main` blocks and the teams
@@ -14,44 +79,21 @@ it is rather than as more string.
 beside the source. On save, the same compile runs to report problems as
 diagnostics — the real compiler, so nothing passes here and is refused later.
 
-**Mission Control.** The OMAR activity bar shows what an `omar serve` daemon
-is running: every deployment it has started, the selected one's status,
-teams, agents and reactions, and whether the picture is **LIVE**, **STALE**
-(the event stream broke and what is shown is what was last known) or
-**FINAL**. The topology panel draws the deployment as the runtime describes
-it — instances as nested boxes, reactions carrying their state — and a click
-on anything inspects it. The Artifacts view lists what the run wrote (the
-program, outputs, each agent's log and instructions) and opens each as an
-ordinary document. The Guarantees view keeps ENFORCED, MONITORED and
-UNCHECKED apart and marks nothing PROVEN, because nothing is. `OMAR: Run
-Program` starts the open `.omar` file through the daemon; Stop and Kill go
-through the `omar` CLI. Nothing is cached across a fetch and nothing is
-invented: the extension shows what the runtime says. Point `omar.runtimeUrl` at the daemon
-(default `http://127.0.0.1:7340`); see [docs/mission-control.md](docs/mission-control.md)
-for what the runtime exposes and what it does not.
-
-**Draws the topology.** `OMAR: Show topology diagram` opens a panel beside the
-editor showing what the program describes: ports, timers, reactions, and the
-edges between them. Save and it redraws.
-
-Point `omar.diagramServerUrl` at a running diagram server and the same panel
-follows the run — which reaction is working, what each port carries, where
-logical time has reached. Without one it keeps showing the compiled topology,
-which is the honest thing: the program exists, it just is not running.
-
-```
-omar run program.omar --input request=hello --diagram-server --diagram-address 127.0.0.1:7341
-```
+**Draws the topology of a file.** `OMAR: Show topology diagram` opens a panel
+beside the editor showing what the program describes, without running it.
+Save and it redraws. With `omar.diagramServerUrl` set it follows that run;
+Mission Control's **Follow a Diagram Server** command does the same, read
+only, without a daemon.
 
 ## Settings
 
 | Setting | Default | |
 | --- | --- | --- |
-| `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens. |
-| `omar.dataDir` | `~/.omar` | The runtime's data directory, on the extension host; artifacts are read from it. |
+| `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens, as the extension host sees it. |
+| `omar.dataDir` | `~/.omar` | The runtime's data directory on the extension host; artifacts are read from it. |
 | `omar.cliPath` | `omar` | Used to stop or kill a deployment. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name. |
-| `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`. |
+| `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`, for the per-file diagram. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |
 
 ## Diagnostics are positioned by guessing
@@ -71,25 +113,28 @@ would make this exact, and that is where the fix belongs.
 ```bash
 npm install
 npm run build
-npm test          # skips the compiler tests when omarc is not built
+npm test              # skips the compiler tests when omarc is not built
 npm run lint
 npm run test:vscode   # a real VS Code against a stub runtime; needs a display or xvfb-run
 ```
 
 Press <kbd>F5</kbd> in VS Code to launch a window with the extension loaded, and
-open `examples/Review.omar`.
+open `examples/Pipeline.omar`.
 
 The tests that use the real compiler find it at `../omar/lang/.lake/build/bin/omarc`
 or wherever `OMARC_BIN` points, and skip themselves when it is not there. CI runs
 them in a job of their own, because checking how the compiler's errors are parsed
 against strings written here is not the same as checking it against the compiler.
+CI also starts a real VS Code under `xvfb` with a stub runtime, and checks
+activation, the commands, a picture going live, inspection, artifacts opening,
+and a run being started.
 
 ## Not yet
 
-- **No language server.** No completion, no go-to-definition, no hover. The
-  compiler knows the whole topology, so all three are reachable, but they want a
-  server rather than a compile-per-save.
-- **The diagram does not nest.** Containers are in the model; the drawing lays
-  everything out in one plane, so a program that instantiates teams inside teams
-  is drawn flat.
+- **No language server.** No completion, no go-to-definition, no hover.
+- **No proofs.** The guarantee model carries Lean proof evidence scoped to a
+  program revision, and marks a proof for another revision stale, but the
+  runtime produces none yet.
+- **No runtime-published guarantees.** The Guarantees view is a catalogue of
+  what the runtime's semantics establish, and says so.
 - **No formatter.**

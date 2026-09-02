@@ -2,7 +2,7 @@
   "name": "omar-vscode",
   "displayName": "OMAR",
   "description": "OMAR language support and Mission Control: syntax highlighting, compilation, and live observation of running deployments.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "BSD-3-Clause",
   "publisher": "omar-os",
   "repository": {
@@ -13,6 +13,16 @@
     "vscode": "^1.90.0",
     "node": ">=20"
   },
+  "extensionKind": [
+    "workspace"
+  ],
+  "keywords": [
+    "omar",
+    "agents",
+    "mission control",
+    "topology",
+    "orchestration"
+  ],
   "categories": [
     "Programming Languages",
     "Visualization"

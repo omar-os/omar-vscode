@@ -3,7 +3,17 @@ import * as vscode from "vscode";
 import { dataDir, workspaceFiles } from "../artifacts/files";
 import { listArtifacts, type Artifact, type ArtifactGroup, type ArtifactListing } from "../artifacts/store";
 import { formatClock } from "../model/format";
-import type { RuntimeSession } from "../runtime/RuntimeSession";
+import type { RuntimeSession, SessionState } from "../runtime/RuntimeSession";
+
+/**
+ * When to list again: a different run, a change of status, or the snapshot
+ * arriving — the producers of logs are named from the snapshot's agents, so
+ * a listing made before it has none.
+ */
+function keyOf(state: SessionState): string | null {
+  if (!state.selected) return null;
+  return `${state.selected}:${state.live?.record.status ?? ""}:${state.live?.snapshot ? "picture" : "blank"}`;
+}
 
 export type ArtifactNode =
   | { kind: "caveat"; text: string }
@@ -38,8 +48,7 @@ export class ArtifactsProvider implements vscode.TreeDataProvider<ArtifactNode>,
   constructor(private readonly session: RuntimeSession) {
     this.subscriptions.push(
       session.onDidChange((state) => {
-        const key = state.selected ? `${state.selected}:${state.live?.record.status ?? ""}` : null;
-        if (key !== this.listedFor) void this.relist();
+        if (keyOf(state) !== this.listedFor) void this.relist();
       }),
     );
     this.timer = setInterval(() => {
@@ -51,7 +60,7 @@ export class ArtifactsProvider implements vscode.TreeDataProvider<ArtifactNode>,
   async relist(): Promise<void> {
     const run = this.session.selectedRun;
     const state = this.session.current;
-    this.listedFor = state.selected ? `${state.selected}:${state.live?.record.status ?? ""}` : null;
+    this.listedFor = keyOf(state);
     if (!run) {
       this.listing = null;
       this.watch(null);
