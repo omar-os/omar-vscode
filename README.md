@@ -18,8 +18,12 @@ diagnostics — the real compiler, so nothing passes here and is refused later.
 is running: every deployment it has started, the selected one's status,
 teams, agents and reactions, and whether the picture is **LIVE**, **STALE**
 (the event stream broke and what is shown is what was last known) or
-**FINAL**. Nothing is cached across a fetch and nothing is invented: the
-extension shows what the runtime says. Point `omar.runtimeUrl` at the daemon
+**FINAL**. The topology panel draws the deployment as the runtime describes
+it — instances as nested boxes, reactions carrying their state — and a click
+on anything inspects it. The Artifacts view lists what the run wrote (the
+program, outputs, each agent's log and instructions) and opens each as an
+ordinary document. Nothing is cached across a fetch and nothing is invented:
+the extension shows what the runtime says. Point `omar.runtimeUrl` at the daemon
 (default `http://127.0.0.1:7340`); see [docs/mission-control.md](docs/mission-control.md)
 for what the runtime exposes and what it does not.
 
@@ -41,6 +45,7 @@ omar run program.omar --input request=hello --diagram-server --diagram-address 1
 | Setting | Default | |
 | --- | --- | --- |
 | `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens. |
+| `omar.dataDir` | `~/.omar` | The runtime's data directory, on the extension host; artifacts are read from it. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name. |
 | `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |

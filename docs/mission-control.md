@@ -52,6 +52,23 @@ agent's `instance` is a name.
 `connection` is one of `connecting`, `live`, `stale`, `final`. A view must
 show it. Cached state is never presented as live.
 
+## Artifacts (`src/artifacts/`)
+
+The daemon serves none of a run's files. It writes them under its data
+directory (`omar.dataDir`, default `~/.omar`, resolved on the extension host —
+the remote machine under Remote SSH):
+
+    <data>/ea/<ea>/serve/<run_id>/program.omar     the program as submitted
+    <data>/ea/<ea>/topologies/<team>/
+        deployment.json  outputs.json  state.json
+        logs/<agent>.txt          the agent's pane, captured at the end
+        agents/<agent>/system.md  the agent's standing instructions
+
+`listArtifacts` reads these and names the agent a log or instruction file
+came from. The topology directory is per team, so a rerun overwrites it; the
+view says so when the directory's record is newer than the run shown. Files
+open with `vscode.open`, never a viewer of the extension's own.
+
 ## What the runtime does not expose yet
 
 Kept out of the UI rather than faked:
