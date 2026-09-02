@@ -15,7 +15,7 @@ import { discover, NONE, type Capabilities } from "./capabilities";
  * every couple of seconds is cheap, and it doubles as the liveness check.
  */
 
-export type Reach = "disconnected" | "connecting" | "connected" | "unreachable";
+export type Reach = "disconnected" | "connecting" | "starting" | "connected" | "unreachable";
 
 export type SessionState = {
   url: string | null;
@@ -54,6 +54,13 @@ export class RuntimeSession implements vscode.Disposable {
   private serve: ServeClient | null = null;
   /** How capabilities are worked out; the extension supplies the CLI path and the data directory check. */
   probe: (() => Promise<{ cliPath: string; artifactsReadable: boolean }>) | null = null;
+  /**
+   * How a daemon is started when none answers; resolves true once one does.
+   * Tried on connect, and again from the poll no more than once a half
+   * minute, so a daemon that will not start is not started in a loop.
+   */
+  launcher: ((url: string, reason: string) => Promise<boolean>) | null = null;
+  private lastLaunch = 0;
   private poll: NodeJS.Timeout | null = null;
   private following: AbortController | null = null;
 
@@ -77,7 +84,23 @@ export class RuntimeSession implements vscode.Disposable {
     this.serve = client;
     this.set({ url: client.url, reach: "connecting", problem: null, runs: [], selected: null, live: null, mode: "daemon", capabilities: NONE });
     await this.refresh();
-    this.poll = setInterval(() => void this.refresh(), POLL_MS);
+    if (this.state.reach === "unreachable" && this.serve === client) await this.launch("nothing answered on connect");
+    if (this.serve === client) this.poll = setInterval(() => void this.refresh(), POLL_MS);
+  }
+
+  /** Ask the launcher for a daemon, and connect to it if one comes up. */
+  private async launch(reason: string): Promise<void> {
+    const serve = this.serve;
+    if (!this.launcher || !serve || Date.now() - this.lastLaunch < 30_000) return;
+    this.lastLaunch = Date.now();
+    this.set({ reach: "starting", problem: null });
+    const started = await this.launcher(serve.url, reason);
+    if (this.serve !== serve) return;
+    if (started) {
+      await this.refresh();
+    } else {
+      this.set({ reach: "unreachable", problem: this.state.problem ?? "The runtime could not be started." });
+    }
   }
 
   /**
@@ -160,7 +183,13 @@ export class RuntimeSession implements vscode.Disposable {
       // The daemon is gone or is not OMAR; either way the list it gave is
       // history now, and the follower will notice on its own.
       const problem = cause instanceof RuntimeRefused ? cause.message : describe(cause);
+      const wasReachable = this.state.reach === "connected";
       this.set({ reach: "unreachable", problem, capabilities: NONE });
+      // A daemon that went away, or one that never came: try to start one,
+      // from the poll rather than here, so this refresh returns.
+      if (this.poll && !(cause instanceof RuntimeRefused)) {
+        setTimeout(() => void this.launch(wasReachable ? "the runtime stopped answering" : "nothing is answering"), 0);
+      }
     } finally {
       this.refreshing = false;
     }

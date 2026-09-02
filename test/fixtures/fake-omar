@@ -1,0 +1,35 @@
+#!/usr/bin/env node
+// A stand-in for the `omar` binary, for tests of starting the runtime.
+// `--version` answers like the real one; `serve --address H:P` listens there
+// and answers /health and /v1/runs the way omar serve does, until killed.
+const { createServer } = require("node:http");
+
+const [command, ...rest] = process.argv.slice(2);
+if (command === "--version") {
+  console.log("omar 0.0.0-fake");
+  process.exit(0);
+}
+if (command !== "serve") {
+  console.error(`fake omar: unknown command ${command}`);
+  process.exit(2);
+}
+const at = rest.indexOf("--address");
+const [host, port] = (at >= 0 ? rest[at + 1] : "127.0.0.1:7340").split(":");
+const server = createServer((request, response) => {
+  const json = (status, body) => {
+    response.writeHead(status, { "content-type": "application/json", connection: "close" });
+    response.end(JSON.stringify(body));
+  };
+  if (request.url === "/health") return json(200, { status: "ok", protocol_version: 1 });
+  if (request.url === "/v1/runs") return json(200, { runs: [] });
+  json(404, { error: "not found" });
+});
+server.listen(Number(port), host, () => {
+  console.log(`OMAR serve: http://${host}:${port}`);
+  console.log("Executive assistant: (not launched)");
+});
+server.on("error", (error) => {
+  console.error(`fake omar: ${error.message}`);
+  process.exit(1);
+});
+process.on("SIGTERM", () => process.exit(0));

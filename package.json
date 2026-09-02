@@ -128,6 +128,20 @@
         "command": "omar.stopDeployment",
         "title": "OMAR: Stop Deployment",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "omar.startRuntime",
+        "title": "OMAR: Start Runtime",
+        "icon": "$(play)"
+      },
+      {
+        "command": "omar.stopRuntime",
+        "title": "OMAR: Stop Runtime"
+      },
+      {
+        "command": "omar.showRuntimeLog",
+        "title": "OMAR: Show Runtime Log",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -232,6 +246,21 @@
           "default": "http://127.0.0.1:7340",
           "description": "Address of `omar serve`, the daemon Mission Control reads deployments from."
         },
+        "omar.autoStartRuntime": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start `omar serve` when nothing answers at a loopback `omar.runtimeUrl`. The daemon runs as a child of the extension and stops with it; a daemon that was already running is left alone."
+        },
+        "omar.serveArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "--no-ea"
+          ],
+          "description": "Extra arguments for the `omar serve` the extension starts. `--no-ea` leaves the executive assistant, which Mission Control here has no chat for, unstarted."
+        },
         "omar.dataDir": {
           "type": "string",
           "default": "~/.omar",
@@ -321,7 +350,12 @@
       },
       {
         "view": "omar.deployments",
-        "contents": "The runtime is unreachable. Start it with `omar serve`, or point `omar.runtimeUrl` elsewhere.\n[Retry](command:omar.refresh)\n[Change address](command:omar.connect)",
+        "contents": "Starting the runtime\u2026\n[Show runtime log](command:omar.showRuntimeLog)",
+        "when": "omar.reach == 'starting'"
+      },
+      {
+        "view": "omar.deployments",
+        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\n[Start runtime](command:omar.startRuntime)\n[Show runtime log](command:omar.showRuntimeLog)\n[Change address](command:omar.connect)",
         "when": "omar.reach == 'unreachable'"
       },
       {

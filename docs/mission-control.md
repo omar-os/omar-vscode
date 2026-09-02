@@ -128,6 +128,22 @@ The follower keeps every event it applied, with a note where the stream broke
 or a gap was filled from a snapshot. The Events view lists them newest
 first; a reaction's event inspects the reaction.
 
+## Starting the runtime
+
+`src/runtime/serve.ts` and `RuntimeLauncher.ts`. When a connect attempt
+finds nothing answering at a loopback `omar.runtimeUrl`, the session asks the
+launcher for a daemon: `omar serve --address host:port` plus
+`omar.serveArguments` (default `--no-ea`), spawned as a child of the
+extension host with `OMARC_BIN` set when `omar.compilerPath` is a path. The
+session shows **starting** until `/health` answers (20s at most), then
+connects. Output goes to the **OMAR Runtime** output channel. The poll tries
+again no more than once a half minute if the daemon goes away, so a daemon
+that will not start is not started in a loop. A daemon that was already
+answering is never touched, and only one the extension started is stopped —
+on `OMAR: Stop Runtime`, on deactivation, and when the host process exits.
+Not loopback, or `omar.autoStartRuntime` off: nothing is started and the
+view says what to do.
+
 ## Operator controls and capabilities
 
 Every control is a call the runtime itself authorises; the extension decides
