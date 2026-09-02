@@ -126,6 +126,40 @@ daemon's API has no permission mode, so the extension cannot offer one. But
 change the run; the session is then read-only by construction and says so
 in the status bar and the Deployment view.
 
+## Remote SSH
+
+`package.json` declares `"extensionKind": ["workspace"]`, so under Remote SSH
+the extension host — and with it every `fetch`, every file read, and the
+`omar` CLI call — runs on the remote machine, where the daemon is. Nothing in
+the extension touches the local machine's disk or network: URLs are the
+daemon's loopback address as the remote sees it, artifact paths are read
+through `vscode.workspace.fs` and opened with `vscode.open`, and `~` in
+`omar.dataDir` is the remote user's home. The one thing to set is nothing,
+when the daemon listens on its default address on the same host.
+
+Not verified in CI: the headless run is a local VS Code. Verified by
+construction and by the design above; a manual check is to connect to a host
+running `omar serve`, open the OMAR activity bar, and confirm the run list,
+a live picture, and an artifact opening.
+
+## Testing
+
+- `node --test test/*.test.mjs` — the pure parts: protocol parsing against
+  snapshots captured from real runs (`test/fixtures/*.v1.json`), SSE
+  chunking, the reconnection scenario (disconnect, the run moves on,
+  reconnect, no repeated or backwards transition), layout containment and
+  non-overlap, inspection rows, artifact listing on a fake disk, guarantees,
+  input parsing.
+- `xvfb-run -a node test/vscode/run.mjs` — a real VS Code, the extension
+  loaded, a stub runtime (`test/vscode/stub-runtime.js`) serving a captured
+  snapshot and an SSE event: activation, commands, unreachable reported, a
+  picture going live with the streamed transition, the panel drawn, a node
+  and a guarantee inspected, highlight on and off, artifacts listed and a
+  log opened in an editor, a run started with mocked prompts, and the
+  diagram-only read-only connection.
+- Manual, against a real daemon: `OMAR_SUITE=screenshot.js` or
+  `OMAR_SUITE=stop-check.js` with `test/vscode/manual-run.mjs`.
+
 ## What the runtime does not expose yet
 
 Kept out of the UI rather than faked:
