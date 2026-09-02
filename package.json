@@ -50,6 +50,34 @@
         "command": "omar.showDiagram",
         "title": "OMAR: Show topology diagram",
         "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "omar.connect",
+        "title": "OMAR: Connect to Runtime",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "omar.disconnect",
+        "title": "OMAR: Disconnect",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "omar.refresh",
+        "title": "OMAR: Refresh",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "omar.selectDeployment",
+        "title": "OMAR: Select Deployment",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "omar.inspect",
+        "title": "OMAR: Inspect"
+      },
+      {
+        "command": "omar.showMenu",
+        "title": "OMAR: Mission Control Menu"
       }
     ],
     "menus": {
@@ -58,6 +86,33 @@
           "command": "omar.showDiagram",
           "when": "resourceLangId == omar",
           "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "omar.refresh",
+          "when": "view == omar.deployments && omar.reach != 'disconnected'",
+          "group": "navigation@1"
+        },
+        {
+          "command": "omar.connect",
+          "when": "view == omar.deployments",
+          "group": "navigation@2"
+        },
+        {
+          "command": "omar.disconnect",
+          "when": "view == omar.deployments && omar.reach != 'disconnected'",
+          "group": "navigation@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "omar.inspect",
+          "when": "false"
+        },
+        {
+          "command": "omar.showMenu",
+          "when": "false"
         }
       ]
     },
@@ -85,14 +140,76 @@
           "description": "Compile a .omar file when it is saved, to report errors as diagnostics."
         }
       }
-    }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "omar",
+          "title": "OMAR",
+          "icon": "media/omar.svg"
+        }
+      ]
+    },
+    "views": {
+      "omar": [
+        {
+          "id": "omar.deployments",
+          "name": "Deployments",
+          "icon": "media/omar.svg",
+          "contextualTitle": "OMAR"
+        },
+        {
+          "id": "omar.summary",
+          "name": "Deployment",
+          "icon": "media/omar.svg"
+        },
+        {
+          "id": "omar.teams",
+          "name": "Teams",
+          "icon": "media/omar.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "omar.deployments",
+        "contents": "Not connected to an OMAR runtime.\n[Connect](command:omar.connect)",
+        "when": "omar.reach == 'disconnected'"
+      },
+      {
+        "view": "omar.deployments",
+        "contents": "Connecting\u2026",
+        "when": "omar.reach == 'connecting'"
+      },
+      {
+        "view": "omar.deployments",
+        "contents": "The runtime is unreachable. Start it with `omar serve`, or point `omar.runtimeUrl` elsewhere.\n[Retry](command:omar.refresh)\n[Change address](command:omar.connect)",
+        "when": "omar.reach == 'unreachable'"
+      },
+      {
+        "view": "omar.deployments",
+        "contents": "Connected. The runtime has no deployments yet; it lists the runs it has started since it came up.",
+        "when": "omar.reach == 'connected'"
+      },
+      {
+        "view": "omar.summary",
+        "contents": "No deployment selected.",
+        "when": "!omar.hasSelection"
+      },
+      {
+        "view": "omar.teams",
+        "contents": "No deployment selected.",
+        "when": "!omar.hasSelection"
+      }
+    ]
   },
   "scripts": {
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
     "lint": "eslint src test",
     "test": "npm run build && node --test test/*.test.mjs",
-    "vscode:prepublish": "npm run build"
+    "vscode:prepublish": "npm run build",
+    "test:vscode": "npm run build && node test/vscode/run.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -100,6 +217,7 @@
     "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.9.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.66.0"

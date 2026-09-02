@@ -3,10 +3,18 @@ import * as vscode from "vscode";
 import { compile } from "./omarc";
 import { fromBytecode, fromSnapshot, type Topology } from "./diagram";
 import { render } from "./webview";
+import { RuntimeSession } from "./runtime/RuntimeSession";
+import { DeploymentsProvider } from "./views/DeploymentsProvider";
+import { SummaryProvider } from "./views/SummaryProvider";
+import { TeamsProvider } from "./views/TeamsProvider";
+import { StatusBar } from "./views/StatusBar";
 
 const LANGUAGE = "omar";
 
-export function activate(context: vscode.ExtensionContext): void {
+/** What the extension hands back, so a test can watch the session it runs. */
+export type OmarApi = { session: RuntimeSession };
+
+export function activate(context: vscode.ExtensionContext): OmarApi {
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE);
   const panels = new DiagramPanels(context, diagnostics);
   context.subscriptions.push(diagnostics, panels);
@@ -54,9 +62,120 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.workspace.onDidCloseTextDocument((document) => diagnostics.delete(document.uri)),
   );
+
+  return { session: activateMissionControl(context) };
 }
 
 export function deactivate(): void {}
+
+/**
+ * Mission Control: the runtime's deployments, read through one session.
+ *
+ * The views are thin. Each asks the session for what it holds and redraws
+ * when told; none keeps state of its own, so none can disagree with another.
+ */
+function activateMissionControl(context: vscode.ExtensionContext): RuntimeSession {
+  const session = new RuntimeSession();
+  const deployments = new DeploymentsProvider(session);
+  const summary = new SummaryProvider(session);
+  const teams = new TeamsProvider(session);
+  context.subscriptions.push(
+    session,
+    deployments,
+    summary,
+    teams,
+    new StatusBar(session),
+    vscode.window.registerTreeDataProvider("omar.deployments", deployments),
+    vscode.window.registerTreeDataProvider("omar.summary", summary),
+    vscode.window.registerTreeDataProvider("omar.teams", teams),
+    session.onDidChange((state) => {
+      void vscode.commands.executeCommand("setContext", "omar.reach", state.reach);
+      void vscode.commands.executeCommand("setContext", "omar.hasSelection", state.selected !== null);
+    }),
+
+    vscode.commands.registerCommand("omar.connect", async (url?: string) => {
+      const configured = configuredUrl();
+      const chosen =
+        url ??
+        (await vscode.window.showInputBox({
+          title: "Connect to an OMAR runtime",
+          prompt: "Address of omar serve",
+          value: configured,
+          validateInput: (value) => {
+            try {
+              new URL(value);
+              return null;
+            } catch {
+              return "Not a URL.";
+            }
+          },
+        }));
+      if (!chosen) return;
+      if (chosen !== configured) {
+        await vscode.workspace
+          .getConfiguration("omar")
+          .update("runtimeUrl", chosen, vscode.ConfigurationTarget.Global);
+      }
+      await session.connect(chosen);
+    }),
+    vscode.commands.registerCommand("omar.disconnect", () => session.disconnect()),
+    vscode.commands.registerCommand("omar.refresh", () => session.refresh()),
+    vscode.commands.registerCommand("omar.selectDeployment", async (runId?: string) => {
+      if (runId) {
+        session.select(runId);
+        return;
+      }
+      const runs = session.current.runs;
+      if (runs.length === 0) {
+        vscode.window.showInformationMessage("The runtime has no deployments.");
+        return;
+      }
+      const pick = await vscode.window.showQuickPick(
+        runs.map((run) => ({
+          label: run.team,
+          description: run.status.toUpperCase(),
+          detail: run.run_id,
+          runId: run.run_id,
+        })),
+        { title: "Select a deployment" },
+      );
+      if (pick) session.select(pick.runId);
+    }),
+    vscode.commands.registerCommand("omar.inspect", (id: string) => {
+      // Until the inspector exists, the tree's own tooltip is the detail.
+      void vscode.commands.executeCommand("setContext", "omar.inspected", id);
+    }),
+    vscode.commands.registerCommand("omar.showMenu", async () => {
+      const state = session.current;
+      const choices = [
+        state.reach === "disconnected"
+          ? { label: "$(plug) Connect to runtime", command: "omar.connect" }
+          : { label: "$(debug-disconnect) Disconnect", command: "omar.disconnect" },
+        { label: "$(list-selection) Select deployment", command: "omar.selectDeployment" },
+        { label: "$(refresh) Refresh", command: "omar.refresh" },
+      ];
+      const pick = await vscode.window.showQuickPick(choices, {
+        title: state.url ? `OMAR · ${state.url}` : "OMAR",
+      });
+      if (pick) await vscode.commands.executeCommand(pick.command);
+    }),
+
+    vscode.workspace.onDidChangeConfiguration((change) => {
+      if (change.affectsConfiguration("omar.runtimeUrl") && session.current.reach !== "disconnected") {
+        void session.connect(configuredUrl());
+      }
+    }),
+  );
+
+  // Connect on activation: the address has a default, and an unreachable
+  // daemon is shown as exactly that rather than as a prompt.
+  void session.connect(configuredUrl());
+  return session;
+}
+
+function configuredUrl(): string {
+  return vscode.workspace.getConfiguration("omar").get<string>("runtimeUrl", "http://127.0.0.1:7340");
+}
 
 function omarEditor(): vscode.TextEditor | undefined {
   const editor = vscode.window.activeTextEditor;
