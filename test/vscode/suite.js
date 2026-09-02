@@ -21,7 +21,7 @@ async function run() {
   const extension = vscode.extensions.getExtension("omar-os.omar-vscode");
   assert.ok(extension, "the extension is installed in the test host");
   const api = await extension.activate();
-  const { session, selection, panel, artifacts, guarantees } = api;
+  const { session, launcher, selection, panel, artifacts, guarantees } = api;
 
   // A data directory shaped like the runtime's, so the artifacts view has
   // something real to list and open.
@@ -134,6 +134,28 @@ async function run() {
     assert.equal(session.current.reach, "disconnected");
     assert.equal(session.current.live, null);
 
+    // Nothing answering at a loopback address: the extension starts a runtime
+    // itself (here the fake `omar` in the fixtures) and connects once it
+    // answers, and stops it when asked.
+    const free = await new Promise((resolve) => {
+      const probe = require("node:net").createServer();
+      probe.listen(0, "127.0.0.1", () => {
+        const { port } = probe.address();
+        probe.close(() => resolve(port));
+      });
+    });
+    const configuration = vscode.workspace.getConfiguration("omar");
+    await configuration.update("cliPath", join(__dirname, "..", "fixtures", "fake-omar"), vscode.ConfigurationTarget.Global);
+    await configuration.update("autoStartRuntime", true, vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand("omar.connect", `http://127.0.0.1:${free}`);
+    await until(() => session.current.reach === "connected", "the runtime the extension started to answer", 30_000);
+    assert.equal(launcher.running, true, "the extension owns the daemon it started");
+    await vscode.commands.executeCommand("omar.stopRuntime");
+    await until(() => !launcher.running, "the started runtime to stop");
+    await until(() => session.current.reach !== "connected", "the session to notice the runtime is gone", 15_000);
+    await configuration.update("autoStartRuntime", false, vscode.ConfigurationTarget.Global);
+    await configuration.update("cliPath", undefined, vscode.ConfigurationTarget.Global);
+
     // A diagram server alone is read only by construction.
     await vscode.commands.executeCommand("omar.connectDiagram", stub.url);
     await until(() => session.current.reach === "connected" && session.current.live?.connection === "live", "the diagram-only picture to go live");
@@ -146,7 +168,7 @@ async function run() {
     stub.close();
     // The test profile is reused by a developer's own runs; leave it as found.
     await vscode.workspace.getConfiguration("omar").update("dataDir", undefined, vscode.ConfigurationTarget.Global);
-    await vscode.workspace.getConfiguration("omar").update("runtimeUrl", undefined, vscode.ConfigurationTarget.Global);
+    await vscode.workspace.getConfiguration("omar").update("cliPath", undefined, vscode.ConfigurationTarget.Global);
   }
 }
 

@@ -21,6 +21,7 @@ export default [
         URL: "readonly",
         AbortController: "readonly",
         setTimeout: "readonly",
+        fetch: "readonly",
         require: "readonly",
         module: "writable",
         __dirname: "readonly",

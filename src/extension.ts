@@ -6,6 +6,7 @@ import { diagramOnlySource } from "./client/diagramOnly";
 import { followRun } from "./client/follow";
 import { DiagramWebview } from "./topology/DiagramWebview";
 import { RuntimeSession } from "./runtime/RuntimeSession";
+import { RuntimeLauncher } from "./runtime/RuntimeLauncher";
 import { isRunFinished } from "./client/protocol";
 import { normalizeRuntimeUrl } from "./client/OmarClient";
 import { formatNanos, formatTag } from "./model/format";
@@ -27,6 +28,7 @@ const LANGUAGE = "omar";
 /** What the extension hands back, so a test can watch the session it runs. */
 export type OmarApi = {
   session: RuntimeSession;
+  launcher: RuntimeLauncher;
   selection: Selection;
   panel: MissionControlPanel;
   artifacts: ArtifactsProvider;
@@ -95,6 +97,8 @@ export function deactivate(): void {}
  */
 function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const session = new RuntimeSession();
+  const launcher = new RuntimeLauncher();
+  session.launcher = (url, reason) => launcher.start(url, reason);
   session.probe = async () => ({
     cliPath: cliPath(),
     artifactsReadable: (await workspaceFiles.stat(dataDir())) !== null,
@@ -110,6 +114,24 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
   const panel = new MissionControlPanel(context.extensionUri, session, selection);
   context.subscriptions.push(
+    launcher,
+    vscode.commands.registerCommand("omar.startRuntime", async () => {
+      const url = session.current.url ?? configuredUrl();
+      if (session.current.reach === "connected") {
+        vscode.window.showInformationMessage(`A runtime is already answering at ${url}.`);
+        return;
+      }
+      if (await launcher.start(url, "asked to")) await session.connect(url);
+    }),
+    vscode.commands.registerCommand("omar.stopRuntime", () => {
+      if (!launcher.running) {
+        vscode.window.showInformationMessage("The extension did not start the running runtime, so it will not stop it.");
+        return;
+      }
+      launcher.stop();
+      void session.refresh();
+    }),
+    vscode.commands.registerCommand("omar.showRuntimeLog", () => launcher.showLog()),
     artifacts,
     guarantees,
     events,
@@ -258,10 +280,10 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
     }),
   );
 
-  // Connect on activation: the address has a default, and an unreachable
-  // daemon is shown as exactly that rather than as a prompt.
+  // Connect on activation: the address has a default, and when nothing
+  // answers there the session starts a runtime rather than asking.
   void session.connect(configuredUrl());
-  return { session, selection, panel, artifacts, guarantees };
+  return { session, launcher, selection, panel, artifacts, guarantees };
 }
 
 function sameAddress(a: string, b: string | null): boolean {

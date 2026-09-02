@@ -24,6 +24,10 @@ export class StatusBar implements vscode.Disposable {
           this.item.text = "$(sync~spin) OMAR: Connecting…";
           this.item.tooltip = `Connecting to ${state.url}`;
           break;
+        case "starting":
+          this.item.text = "$(sync~spin) OMAR: Starting runtime…";
+          this.item.tooltip = `Starting omar serve for ${state.url}`;
+          break;
         case "unreachable":
           this.item.text = "$(warning) OMAR: Unreachable";
           this.item.tooltip = `${state.url}\n${state.problem ?? ""}`;

@@ -48,12 +48,14 @@ it does not know.
 
 ### Try it
 
-```bash
-# In the omar repository, with omarc built (see its README):
-OMARC_BIN=$PWD/lang/.lake/build/bin/omarc omar serve --no-ea
-```
+Install `omar` (`brew install omar-os/omar/omar`, or the install script in
+its README) so it is on `PATH`, together with `omarc`. Open the OMAR
+activity bar: when nothing answers at `omar.runtimeUrl` the extension starts
+`omar serve` itself, as a child that stops with the window, and connects
+once it answers. Its output is in the **OMAR Runtime** output channel. A
+daemon that was already running is used as it is and left alone.
 
-Then in VS Code open `examples/Pipeline.omar`, run **OMAR: Run Program**
+Then open `examples/Pipeline.omar`, run **OMAR: Run Program**
 (input `first.inp` = `1`, real time), and watch the four stages go idle →
 running → completed over about eight seconds in the panel, the Teams view
 and the status bar. Click a stage to inspect it; open its log under
@@ -91,9 +93,11 @@ only, without a daemon.
 | Setting | Default | |
 | --- | --- | --- |
 | `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens, as the extension host sees it. |
+| `omar.autoStartRuntime` | `true` | Start `omar serve` when nothing answers at a loopback address. |
+| `omar.serveArguments` | `["--no-ea"]` | Arguments for the `omar serve` the extension starts. |
 | `omar.dataDir` | `~/.omar` | The runtime's data directory on the extension host; artifacts are read from it. |
-| `omar.cliPath` | `omar` | Used to stop a deployment. |
-| `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name. |
+| `omar.cliPath` | `omar` | Used to start the runtime and to stop a deployment. |
+| `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name; a path is handed to the started runtime as `OMARC_BIN`. |
 | `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`, for the per-file diagram. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |
 
