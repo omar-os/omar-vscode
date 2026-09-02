@@ -14,6 +14,15 @@ it is rather than as more string.
 beside the source. On save, the same compile runs to report problems as
 diagnostics — the real compiler, so nothing passes here and is refused later.
 
+**Mission Control.** The OMAR activity bar shows what an `omar serve` daemon
+is running: every deployment it has started, the selected one's status,
+teams, agents and reactions, and whether the picture is **LIVE**, **STALE**
+(the event stream broke and what is shown is what was last known) or
+**FINAL**. Nothing is cached across a fetch and nothing is invented: the
+extension shows what the runtime says. Point `omar.runtimeUrl` at the daemon
+(default `http://127.0.0.1:7340`); see [docs/mission-control.md](docs/mission-control.md)
+for what the runtime exposes and what it does not.
+
 **Draws the topology.** `OMAR: Show topology diagram` opens a panel beside the
 editor showing what the program describes: ports, timers, reactions, and the
 edges between them. Save and it redraws.
@@ -31,6 +40,7 @@ omar run program.omar --input request=hello --diagram-server --diagram-address 1
 
 | Setting | Default | |
 | --- | --- | --- |
+| `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name. |
 | `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |
@@ -54,6 +64,7 @@ npm install
 npm run build
 npm test          # skips the compiler tests when omarc is not built
 npm run lint
+npm run test:vscode   # a real VS Code against a stub runtime; needs a display or xvfb-run
 ```
 
 Press <kbd>F5</kbd> in VS Code to launch a window with the extension loaded, and

@@ -25,6 +25,9 @@ jobs:
       # Tests that need the compiler skip themselves without it; this job runs
       # the rest, which is everything that does not depend on a Lean toolchain.
       - run: node --test test/*.test.mjs
+      # A real VS Code, headless, with the extension loaded and a stub runtime
+      # to talk to: activation, the commands, and a picture going live.
+      - run: xvfb-run -a node test/vscode/run.mjs
 
   # The compiler is a Lean build, so the tests that use it run apart from the
   # ones that do not. Without this the parsing of its errors is only ever
