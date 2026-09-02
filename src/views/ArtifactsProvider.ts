@@ -42,6 +42,7 @@ export class ArtifactsProvider implements vscode.TreeDataProvider<ArtifactNode>,
   private readonly subscriptions: vscode.Disposable[] = [];
   private listing: ArtifactListing | null = null;
   private listedFor: string | null = null;
+  private generation = 0;
   private watcher: vscode.FileSystemWatcher | null = null;
   private timer: NodeJS.Timeout | null = null;
 
@@ -67,8 +68,13 @@ export class ArtifactsProvider implements vscode.TreeDataProvider<ArtifactNode>,
       this.changed.fire();
       return;
     }
+    // Listings overlap — one from the record, one from the snapshot arriving
+    // a moment later — and the disk answers in no fixed order. Only the latest
+    // asked for may land, or a listing made before the snapshot could
+    // overwrite one made after it and leave every log without its agent.
+    const generation = ++this.generation;
     const listing = await listArtifacts(workspaceFiles, dataDir(), run, state.live?.snapshot ?? null);
-    if (this.session.selectedRun?.run_id !== run.run_id) return;
+    if (generation !== this.generation || this.session.selectedRun?.run_id !== run.run_id) return;
     this.listing = listing;
     this.watch(listing.directory);
     this.changed.fire();

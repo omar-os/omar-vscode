@@ -89,8 +89,11 @@ async function run() {
     assert.ok(session.current.live.log.some((entry) => entry.kind === "event" && entry.event.kind === "reaction_started"));
 
     // The artifacts view lists what the run wrote and opens it natively.
-    await until(() => artifacts.current?.groups.length === 3, "the artifacts to be listed");
-    const log = artifacts.current.groups.find((group) => group.label === "Agent logs").artifacts[0];
+    // Listed with the snapshot in hand, which names the log's agent; a
+    // listing made before it arrived is not the one to look at.
+    const logOf = () => artifacts.current?.groups.find((group) => group.label === "Agent logs")?.artifacts[0];
+    await until(() => logOf()?.producer, "the artifacts to be listed with their producers");
+    const log = logOf();
     assert.equal(log.producer, "agent::watch.agent");
     assert.match(artifacts.current.revision, /^[0-9a-f]{7}$/, "the program has a revision");
     const item = artifacts.getTreeItem({ kind: "artifact", artifact: log });
