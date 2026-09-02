@@ -11,3 +11,4 @@ eslint.config.mjs
 .vscode-test/**
 docs/*.md
 .gitmodules
+.vscode/**
