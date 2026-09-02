@@ -3,6 +3,8 @@ import * as vscode from "vscode";
 import { countsOf, elapsedOf, statusOf } from "../model/deployment";
 import { formatClock, formatElapsed, formatNanos, formatTag } from "../model/format";
 import type { RuntimeSession } from "../runtime/RuntimeSession";
+import type { ArtifactsProvider } from "./ArtifactsProvider";
+import type { GuaranteesProvider } from "./GuaranteesProvider";
 import { connectionIcon, connectionLabel, runIcon } from "./icons";
 
 type Row = { label: string; value: string; icon?: vscode.ThemeIcon; tooltip?: string };
@@ -18,8 +20,15 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
   private readonly subscription: vscode.Disposable;
   private readonly ticker: NodeJS.Timeout;
 
-  constructor(private readonly session: RuntimeSession) {
-    this.subscription = session.onDidChange(() => this.changed.fire());
+  constructor(
+    private readonly session: RuntimeSession,
+    private readonly artifacts: ArtifactsProvider,
+    private readonly guarantees: GuaranteesProvider,
+  ) {
+    this.subscription = vscode.Disposable.from(
+      session.onDidChange(() => this.changed.fire()),
+      artifacts.onDidChangeTreeData(() => this.changed.fire()),
+    );
     this.ticker = setInterval(() => {
       const run = session.selectedRun;
       if (run && !run.finished_at) this.changed.fire();
@@ -43,6 +52,7 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
       { label: "Status", value: status.toUpperCase(), icon: runIcon(status) },
       { label: "Team", value: run.team },
       { label: "Run", value: run.run_id },
+      ...(this.artifacts.current?.revision ? [{ label: "Revision", value: this.artifacts.current.revision, tooltip: "SHA-256 of the program as submitted, first seven digits." }] : []),
       { label: "Started", value: formatClock(run.started_at) },
       { label: "Elapsed", value: formatElapsed(elapsedOf(run, Date.now() / 1000)) },
     ];
@@ -66,6 +76,8 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
         { label: "Lag", value: formatNanos(snapshot.lag), tooltip: "How far physical time has run past the logical clock. Unmeasured is shown as —." },
       );
     }
+    const guarantees = this.guarantees.summary();
+    if (guarantees) rows.push({ label: "Guarantees", value: guarantees, icon: new vscode.ThemeIcon("shield") });
     return rows;
   }
 

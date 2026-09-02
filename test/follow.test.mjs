@@ -125,6 +125,12 @@ describe("following a run", () => {
     }
     const sequences = seen.map((state) => state.sequence);
     assert.deepEqual(sequences, [...sequences].sort((a, b) => a - b), "the sequence never went backwards");
+
+    // The log has every event that was seen, once, and says where it broke.
+    const logged = final.log.filter((entry) => entry.kind === "event").map((entry) => entry.event.sequence);
+    assert.deepEqual(logged, [...new Set(logged)], "no event is logged twice");
+    assert.deepEqual(logged, [...logged].sort((a, b) => a - b), "the log is in order");
+    assert.ok(final.log.some((entry) => entry.kind === "note" && /Connection lost/.test(entry.text)), "the break is noted");
   });
 
   test("a run that is already over is final at once, with no diagram to fetch", async () => {

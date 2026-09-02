@@ -10,7 +10,10 @@ import { TeamsProvider } from "./views/TeamsProvider";
 import { StatusBar } from "./views/StatusBar";
 import { InspectorProvider, Selection } from "./views/Inspector";
 import { MissionControlPanel } from "./topology/MissionControlPanel";
+import type { Guarantee } from "./model/guarantees";
 import { ArtifactsProvider } from "./views/ArtifactsProvider";
+import { GuaranteesProvider } from "./views/GuaranteesProvider";
+import { EventsProvider } from "./views/EventsProvider";
 
 const LANGUAGE = "omar";
 
@@ -20,6 +23,7 @@ export type OmarApi = {
   selection: Selection;
   panel: MissionControlPanel;
   artifacts: ArtifactsProvider;
+  guarantees: GuaranteesProvider;
 };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
@@ -85,16 +89,36 @@ export function deactivate(): void {}
 function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const session = new RuntimeSession();
   const deployments = new DeploymentsProvider(session);
-  const summary = new SummaryProvider(session);
+  const artifacts = new ArtifactsProvider(session);
+  const guarantees = new GuaranteesProvider(session, artifacts);
+  const summary = new SummaryProvider(session, artifacts, guarantees);
   const teams = new TeamsProvider(session);
+  const events = new EventsProvider(session);
   const selection = new Selection();
-  const inspector = new InspectorProvider(session, selection);
+  const inspector = new InspectorProvider(session, selection, guarantees);
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
   const panel = new MissionControlPanel(session, selection);
-  const artifacts = new ArtifactsProvider(session);
   context.subscriptions.push(
     artifacts,
+    guarantees,
+    events,
     vscode.window.registerTreeDataProvider("omar.artifacts", artifacts),
+    vscode.window.registerTreeDataProvider("omar.guarantees", guarantees),
+    vscode.window.registerTreeDataProvider("omar.events", events),
+    vscode.commands.registerCommand("omar.showOnTopology", (ids: string[] | Guarantee) => {
+      selection.setHighlight(Array.isArray(ids) ? ids : ids.subjects);
+      panel.show();
+    }),
+    vscode.commands.registerCommand("omar.clearHighlight", () => selection.setHighlight([])),
+    vscode.commands.registerCommand("omar.openEvidence", async (guarantee: Guarantee) => {
+      for (const evidence of guarantee.evidence) {
+        if (evidence.type === "runtime-mechanism") continue;
+        await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(evidence.uri));
+        return;
+      }
+      const mechanisms = guarantee.evidence.map((evidence) => (evidence.type === "runtime-mechanism" ? evidence.description : "")).filter(Boolean);
+      vscode.window.showInformationMessage(`${guarantee.name}: ${mechanisms.length > 0 ? mechanisms.join("; ") : "nothing establishes this, so there is no evidence to open."}`);
+    }),
     vscode.commands.registerCommand("omar.revealArtifacts", async () => {
       const directory = artifacts.current?.directory;
       if (!directory) {
@@ -204,7 +228,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   // Connect on activation: the address has a default, and an unreachable
   // daemon is shown as exactly that rather than as a prompt.
   void session.connect(configuredUrl());
-  return { session, selection, panel, artifacts };
+  return { session, selection, panel, artifacts, guarantees };
 }
 
 function configuredUrl(): string {

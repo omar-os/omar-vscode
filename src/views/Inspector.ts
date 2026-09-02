@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { inspect, type Row } from "../model/inspect";
+import type { Guarantee } from "../model/guarantees";
 import type { RuntimeSession } from "../runtime/RuntimeSession";
 
 /**
@@ -47,6 +48,8 @@ export class InspectorProvider implements vscode.TreeDataProvider<Row>, vscode.D
   constructor(
     private readonly session: RuntimeSession,
     private readonly selection: Selection,
+    /** Where a `guarantee:` id is looked up. */
+    private readonly guarantees: { find(id: string): Guarantee | null },
   ) {
     this.subscriptions = [
       session.onDidChange(() => this.changed.fire()),
@@ -56,9 +59,12 @@ export class InspectorProvider implements vscode.TreeDataProvider<Row>, vscode.D
 
   /** The heading the view shows: what is selected, and what kind of thing it is. */
   title(): string | null {
-    const snapshot = this.session.current.live?.snapshot;
     const id = this.selection.current;
-    if (!snapshot || !id) return null;
+    if (!id) return null;
+    const guarantee = guaranteeId(id) ? this.guarantees.find(guaranteeId(id)!) : null;
+    if (guarantee) return `${guarantee.name} · ${guarantee.status.toUpperCase()}`;
+    const snapshot = this.session.current.live?.snapshot;
+    if (!snapshot) return null;
     const view = inspect(snapshot, id);
     return view ? `${view.title} · ${view.kind}` : null;
   }
@@ -71,13 +77,25 @@ export class InspectorProvider implements vscode.TreeDataProvider<Row>, vscode.D
       item.command = { command: "omar.inspect", title: "Inspect", arguments: [row.ref] };
       item.iconPath = new vscode.ThemeIcon("arrow-small-right");
     }
+    if (row.open) {
+      item.command = { command: "vscode.open", title: "Open", arguments: [vscode.Uri.file(row.open)] };
+      item.iconPath = new vscode.ThemeIcon("go-to-file");
+      item.resourceUri = vscode.Uri.file(row.open);
+    }
+    if (row.highlight) {
+      item.command = { command: "omar.showOnTopology", title: "Show on topology", arguments: [row.highlight] };
+      item.iconPath = new vscode.ThemeIcon("type-hierarchy");
+    }
     return item;
   }
 
   getChildren(): Row[] {
-    const snapshot = this.session.current.live?.snapshot;
     const id = this.selection.current;
-    if (!snapshot || !id) return [];
+    if (!id) return [];
+    const guarantee = guaranteeId(id) ? this.guarantees.find(guaranteeId(id)!) : null;
+    if (guarantee) return guaranteeRows(guarantee);
+    const snapshot = this.session.current.live?.snapshot;
+    if (!snapshot) return [];
     return inspect(snapshot, id)?.rows ?? [];
   }
 
@@ -85,4 +103,41 @@ export class InspectorProvider implements vscode.TreeDataProvider<Row>, vscode.D
     for (const subscription of this.subscriptions) subscription.dispose();
     this.changed.dispose();
   }
+}
+
+export function guaranteeId(id: string): string | null {
+  return id.startsWith("guarantee:") ? id.slice("guarantee:".length) : null;
+}
+
+/**
+ * A guarantee, row by row: status first, then the property, how it is
+ * established, the evidence, and the facts. Evidence with a file opens it;
+ * a mechanism is named and nothing more, because there is nothing to open.
+ */
+export function guaranteeRows(guarantee: Guarantee): Row[] {
+  const rows: Row[] = [
+    { label: "Status", value: guarantee.status.toUpperCase() },
+    { label: "Runtime enforcement", value: guarantee.enforced ? "enabled" : "none" },
+    { label: "Property", value: guarantee.property },
+    { label: "How", value: guarantee.how },
+    { label: "Source", value: guarantee.source === "runtime" ? "the runtime" : "catalogue of runtime semantics" },
+  ];
+  for (const evidence of guarantee.evidence) {
+    switch (evidence.type) {
+      case "lean-proof":
+        rows.push({ label: "Proof", value: `${evidence.uri} · ${evidence.checker} · @ ${evidence.workflowRevision}`, open: evidence.uri });
+        break;
+      case "artifact":
+        rows.push({ label: "Evidence", value: evidence.description, open: evidence.uri });
+        break;
+      case "runtime-mechanism":
+        rows.push({ label: "Mechanism", value: evidence.description });
+        break;
+    }
+  }
+  for (const [label, value] of guarantee.details) rows.push({ label, value });
+  if (guarantee.subjects.length > 0) {
+    rows.push({ label: "Covers", value: `${guarantee.subjects.length} in the picture`, highlight: guarantee.subjects });
+  }
+  return rows;
 }
