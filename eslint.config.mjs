@@ -7,7 +7,14 @@ export default [
   { ignores: ["out/**", "node_modules/**"] },
   {
     files: ["test/**/*.mjs"],
-    languageOptions: { globals: { process: "readonly" } },
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        URL: "readonly",
+        AbortController: "readonly",
+        setTimeout: "readonly",
+      },
+    },
     rules: { "@typescript-eslint/no-unused-expressions": "off" },
   },
 ];

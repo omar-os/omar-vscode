@@ -1,0 +1,323 @@
+{
+  "protocol_version": 1,
+  "team": "program",
+  "sequence": 10,
+  "status": "running",
+  "current_tag": {
+    "timestamp": 0,
+    "microstep": 0
+  },
+  "lag": 24058,
+  "instances": [
+    {
+      "id": "instance::far",
+      "name": "far",
+      "team": "Relay",
+      "parent": ""
+    },
+    {
+      "id": "instance::near",
+      "name": "near",
+      "team": "Relay",
+      "parent": ""
+    },
+    {
+      "id": "instance::src",
+      "name": "src",
+      "team": "Source",
+      "parent": ""
+    },
+    {
+      "id": "instance::watch",
+      "name": "watch",
+      "team": "Watcher",
+      "parent": ""
+    }
+  ],
+  "agents": [
+    {
+      "id": "agent::far.agent",
+      "name": "far.agent",
+      "backend": "Stub",
+      "instance": "far"
+    },
+    {
+      "id": "agent::near.agent",
+      "name": "near.agent",
+      "backend": "Stub",
+      "instance": "near"
+    },
+    {
+      "id": "agent::src.agent",
+      "name": "src.agent",
+      "backend": "Stub",
+      "instance": "src"
+    },
+    {
+      "id": "agent::watch.agent",
+      "name": "watch.agent",
+      "backend": "Stub",
+      "instance": "watch"
+    }
+  ],
+  "ports": [
+    {
+      "id": "port::far.relayed",
+      "name": "far.relayed",
+      "kind": "output",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "far"
+    },
+    {
+      "id": "port::far.value",
+      "name": "far.value",
+      "kind": "input",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "far"
+    },
+    {
+      "id": "port::near.relayed",
+      "name": "near.relayed",
+      "kind": "output",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "near"
+    },
+    {
+      "id": "port::near.value",
+      "name": "near.value",
+      "kind": "input",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "near"
+    },
+    {
+      "id": "port::src.go",
+      "name": "src.go",
+      "kind": "input",
+      "type": "int",
+      "delay": null,
+      "value": 1,
+      "last_tag": {
+        "timestamp": 0,
+        "microstep": 0
+      },
+      "instance": "src"
+    },
+    {
+      "id": "port::src.value",
+      "name": "src.value",
+      "kind": "output",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "src"
+    },
+    {
+      "id": "port::watch.deep",
+      "name": "watch.deep",
+      "kind": "input",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "watch"
+    },
+    {
+      "id": "port::watch.shallow",
+      "name": "watch.shallow",
+      "kind": "input",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "watch"
+    },
+    {
+      "id": "port::watch.verdict",
+      "name": "watch.verdict",
+      "kind": "output",
+      "type": "int",
+      "delay": null,
+      "value": null,
+      "last_tag": null,
+      "instance": "watch"
+    }
+  ],
+  "timers": [],
+  "reactions": [
+    {
+      "id": "reaction::far.reaction.0",
+      "name": "far.reaction.0",
+      "agent": "agent::far.agent",
+      "order": 2,
+      "triggers": [
+        "port::far.value"
+      ],
+      "effects": [
+        "port::far.relayed"
+      ],
+      "contract": "far.relayed",
+      "status": "completed",
+      "invocation_id": "967b37ca-ff92-4c3d-9758-ddffd5b49495",
+      "instance": "far",
+      "within": null
+    },
+    {
+      "id": "reaction::near.reaction.0",
+      "name": "near.reaction.0",
+      "agent": "agent::near.agent",
+      "order": 1,
+      "triggers": [
+        "port::near.value"
+      ],
+      "effects": [
+        "port::near.relayed"
+      ],
+      "contract": "near.relayed",
+      "status": "completed",
+      "invocation_id": "570bb5af-2e9b-4c20-9c0e-5b3b5ff7fb03",
+      "instance": "near",
+      "within": null
+    },
+    {
+      "id": "reaction::src.reaction.0",
+      "name": "src.reaction.0",
+      "agent": "agent::src.agent",
+      "order": 0,
+      "triggers": [
+        "port::src.go"
+      ],
+      "effects": [
+        "port::src.value"
+      ],
+      "contract": "src.value",
+      "status": "completed",
+      "invocation_id": "afca460d-72c3-4387-a8da-f77814e0c5b9",
+      "instance": "src",
+      "within": null
+    },
+    {
+      "id": "reaction::watch.reaction.0",
+      "name": "watch.reaction.0",
+      "agent": "agent::watch.agent",
+      "order": 3,
+      "triggers": [
+        "port::watch.shallow",
+        "port::watch.deep"
+      ],
+      "effects": [
+        "port::watch.verdict"
+      ],
+      "contract": "watch.verdict",
+      "status": "completed",
+      "invocation_id": "461b7a69-89d8-4bf0-bf45-cc9f80a4af92",
+      "instance": "watch",
+      "within": null
+    }
+  ],
+  "edges": [
+    {
+      "id": "connection::src.value::watch.shallow",
+      "kind": "connection",
+      "source": "port::src.value",
+      "target": "port::watch.shallow",
+      "delay": null
+    },
+    {
+      "id": "connection::src.value::near.value",
+      "kind": "connection",
+      "source": "port::src.value",
+      "target": "port::near.value",
+      "delay": null
+    },
+    {
+      "id": "connection::near.relayed::far.value",
+      "kind": "connection",
+      "source": "port::near.relayed",
+      "target": "port::far.value",
+      "delay": null
+    },
+    {
+      "id": "connection::far.relayed::watch.deep",
+      "kind": "connection",
+      "source": "port::far.relayed",
+      "target": "port::watch.deep",
+      "delay": null
+    },
+    {
+      "id": "trigger::far.value::far.reaction.0",
+      "kind": "trigger",
+      "source": "port::far.value",
+      "target": "reaction::far.reaction.0",
+      "delay": null
+    },
+    {
+      "id": "effect::far.reaction.0::far.relayed",
+      "kind": "effect",
+      "source": "reaction::far.reaction.0",
+      "target": "port::far.relayed",
+      "delay": null
+    },
+    {
+      "id": "trigger::near.value::near.reaction.0",
+      "kind": "trigger",
+      "source": "port::near.value",
+      "target": "reaction::near.reaction.0",
+      "delay": null
+    },
+    {
+      "id": "effect::near.reaction.0::near.relayed",
+      "kind": "effect",
+      "source": "reaction::near.reaction.0",
+      "target": "port::near.relayed",
+      "delay": null
+    },
+    {
+      "id": "trigger::src.go::src.reaction.0",
+      "kind": "trigger",
+      "source": "port::src.go",
+      "target": "reaction::src.reaction.0",
+      "delay": null
+    },
+    {
+      "id": "effect::src.reaction.0::src.value",
+      "kind": "effect",
+      "source": "reaction::src.reaction.0",
+      "target": "port::src.value",
+      "delay": null
+    },
+    {
+      "id": "trigger::watch.shallow::watch.reaction.0",
+      "kind": "trigger",
+      "source": "port::watch.shallow",
+      "target": "reaction::watch.reaction.0",
+      "delay": null
+    },
+    {
+      "id": "trigger::watch.deep::watch.reaction.0",
+      "kind": "trigger",
+      "source": "port::watch.deep",
+      "target": "reaction::watch.reaction.0",
+      "delay": null
+    },
+    {
+      "id": "effect::watch.reaction.0::watch.verdict",
+      "kind": "effect",
+      "source": "reaction::watch.reaction.0",
+      "target": "port::watch.verdict",
+      "delay": null
+    }
+  ]
+}

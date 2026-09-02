@@ -1,0 +1,66 @@
+# Mission Control
+
+The extension is a client of the OMAR runtime. It shows what the runtime says
+and never decides anything the runtime has not: no scheduling, no guarantee
+semantics, no state of its own that outlives a fetch.
+
+## What the runtime exposes
+
+Two servers, both loopback-only HTTP, both existing before this extension.
+
+**`omar serve`** (default `http://127.0.0.1:7340`) admits programs and
+supervises runs. A run is what the product spec calls a deployment.
+
+| Route | Gives |
+| --- | --- |
+| `GET /health` | `{status, protocol_version}` |
+| `GET /v1/runs` | every run this daemon has started, newest last |
+| `GET /v1/runs/{id}` | one run: `status`, `diagram_address`, `started_at`, `finished_at`, `error` |
+| `POST /v1/runs` | start a run from program source and inputs |
+
+Run status: `starting`, `running`, `completed`, `stopped`, `failed`. The list
+is in memory; a restarted daemon has forgotten its runs.
+
+**The diagram server**, one per run, at the run's `diagram_address`. It exists
+only while the run does.
+
+| Route | Gives |
+| --- | --- |
+| `GET /v1/diagram` | the topology and its state, stamped with a `sequence` |
+| `GET /v1/events` | server-sent events from now on; nothing is replayed |
+
+Event kinds: `run_started`, `tag_advanced`, `reaction_started`,
+`reaction_completed`, `run_completed`, `run_failed`. Each carries the
+`sequence` the snapshot would have after it.
+
+Ids are namespaced: `instance::`, `agent::`, `port::`, `timer::`,
+`reaction::`. A reaction's `agent`, `triggers` and `effects` are ids; an
+agent's `instance` is a name.
+
+## The client (`src/client/`)
+
+- `protocol.ts` — the wire shapes, validators that refuse a protocol version
+  they do not speak, normalisers that fill what an older runtime omits, and
+  `applyDiagramEvent`, which folds an event into a snapshot.
+- `sse.ts` — server-sent events parsed by hand; the extension host has `fetch`
+  but no `EventSource`.
+- `OmarClient.ts` — `ServeClient` and `DiagramClient`. Nothing cached.
+- `follow.ts` — `followRun`: snapshot, then stream; a sequence gap re-fetches
+  the snapshot rather than guessing; a broken stream marks the picture
+  **stale** and asks the daemon whether the run ended before trying again.
+
+`connection` is one of `connecting`, `live`, `stale`, `final`. A view must
+show it. Cached state is never presented as live.
+
+## What the runtime does not expose yet
+
+Kept out of the UI rather than faked:
+
+- pause and resume (no such lifecycle state);
+- approvals;
+- sandboxes (agents share the daemon's working directory);
+- a read-only or permission mode (the API has no auth surface);
+- guarantees as a first-class list;
+- proofs (the Lean code is the compiler, not theorems).
+
+Where the extension shows any of these it says what it does not know.
