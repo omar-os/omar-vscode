@@ -1,0 +1,3 @@
+[submodule "vendor/omar"]
+	path = vendor/omar
+	url = https://github.com/omar-os/omar.git

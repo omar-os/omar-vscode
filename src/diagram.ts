@@ -1,230 +1,110 @@
+import type { DiagramSnapshot } from "./client/protocol";
+
 /**
- * The topology a program describes, and where to draw it.
+ * The snapshot a compiled program would have before it runs.
  *
- * Two sources, one shape. A compiled program gives the structure and nothing
- * else; a running one adds what is happening — which reaction is working, what
- * value a port carries, where logical time has reached. The webview is written
- * against the shape, so it does not care which it was handed.
+ * The daemon's `/v1/programs/check` answers with exactly this for a program
+ * it compiles; when there is no daemon, the same shape is read straight off
+ * the bytecode, which is a list of declarations, so the diagram draws the
+ * file the way it would draw the daemon's preview. Nothing here is state:
+ * every port is empty, every reaction idle, the clock unstarted.
  */
-
-export type Node = {
-  id: string;
-  kind: "agent" | "port" | "timer" | "reaction";
-  label: string;
-  /** The instance this belongs to, or "" at the top level. */
-  instance: string;
-  /** input, output, action — ports only. */
-  role?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** Live only: idle, running, or done. */
-  status?: string;
-  /** Live only: what the port carries. */
-  value?: unknown;
-};
-
-export type Edge = {
-  id: string;
-  kind: "connection" | "trigger" | "effect";
-  source: string;
-  target: string;
-  delay: number;
-};
-
-export type Topology = {
-  team: string;
-  nodes: Node[];
-  edges: Edge[];
-  width: number;
-  height: number;
-  /** Live only. */
-  status?: string;
-  tag?: { timestamp: number; microstep: number } | null;
-};
 
 type Instruction = Record<string, unknown>;
 
-const COLUMN = 210;
-const ROW = 54;
-const PADDING = 28;
-
-/**
- * Build a topology from compiled bytecode.
- *
- * The bytecode is a list of declarations, so the structure is read straight off
- * it rather than inferred: instances, agents, ports, timers, reactions, and the
- * three kinds of edge — a connection between ports, and a reaction's own
- * triggers and effects.
- */
-export function fromBytecode(bytecode: unknown): Topology {
+export function fromBytecode(bytecode: unknown): DiagramSnapshot {
   const program = bytecode as { team?: string; instructions?: Instruction[] };
   const instructions = program.instructions ?? [];
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
+  const named = (op: string) => instructions.filter((instruction) => instruction["op"] === op);
+  const text = (value: unknown) => (typeof value === "string" ? value : "");
+  const number = (value: unknown) => (typeof value === "number" ? value : 0);
+  const timers = new Set(named("declare_timer").map((timer) => text(timer["name"])));
 
-  const named = (op: string) =>
-    instructions.filter((instruction) => instruction["op"] === op);
-
-  for (const port of named("define_port")) {
-    nodes.push(bare(`port::${port["name"]}`, "port", String(port["name"]), port, String(port["kind"])));
-  }
-  for (const timer of named("declare_timer")) {
-    nodes.push(bare(`timer::${timer["name"]}`, "timer", String(timer["name"]), timer));
-  }
-  for (const agent of named("spawn_agent")) {
-    nodes.push(bare(`agent::${agent["name"]}`, "agent", String(agent["name"]), agent));
-  }
-  for (const reaction of named("install_reaction")) {
-    const id = `reaction::${reaction["id"]}`;
-    nodes.push(bare(id, "reaction", String(reaction["agent"] ?? reaction["id"]), reaction));
-    // A trigger names a port or a timer, and the two have separate id spaces.
-    for (const trigger of asStrings(reaction["triggers"])) {
-      const source = instructions.some(
-        (candidate) => candidate["op"] === "declare_timer" && candidate["name"] === trigger,
-      )
-        ? `timer::${trigger}`
-        : `port::${trigger}`;
-      edges.push({ id: `trigger::${trigger}::${reaction["id"]}`, kind: "trigger", source, target: id, delay: 0 });
-    }
-    for (const effect of asStrings(reaction["effects"])) {
-      edges.push({ id: `effect::${reaction["id"]}::${effect}`, kind: "effect", source: id, target: `port::${effect}`, delay: 0 });
-    }
-  }
-  for (const connection of named("connect_ports")) {
-    edges.push({
-      id: `connection::${connection["source"]}::${connection["target"]}`,
-      kind: "connection",
-      source: `port::${connection["source"]}`,
-      target: `port::${connection["target"]}`,
-      delay: Number(connection["delay"] ?? 0),
-    });
-  }
-
-  return layout({ team: program.team ?? "", nodes, edges, width: 0, height: 0 });
-}
-
-/** Build a topology from a diagram server's snapshot, which already has state. */
-export function fromSnapshot(snapshot: unknown): Topology {
-  const source = snapshot as {
-    team?: string;
-    status?: string;
-    current_tag?: { timestamp: number; microstep: number } | null;
-    agents?: { id: string; name: string; instance: string }[];
-    ports?: { id: string; name: string; kind: string; instance: string; value?: unknown }[];
-    timers?: { id: string; name: string; instance: string }[];
-    reactions?: { id: string; name: string; agent: string; instance: string; status?: string }[];
-    edges?: { id: string; kind: string; source: string; target: string; delay: number }[];
-  };
-
-  const nodes: Node[] = [
-    ...(source.ports ?? []).map((port) => ({
-      id: port.id, kind: "port" as const, label: port.name, instance: port.instance,
-      role: port.kind, value: port.value, x: 0, y: 0, width: 0, height: 0,
-    })),
-    ...(source.timers ?? []).map((timer) => ({
-      id: timer.id, kind: "timer" as const, label: timer.name, instance: timer.instance,
-      x: 0, y: 0, width: 0, height: 0,
-    })),
-    ...(source.agents ?? []).map((agent) => ({
-      id: agent.id, kind: "agent" as const, label: agent.name, instance: agent.instance,
-      x: 0, y: 0, width: 0, height: 0,
-    })),
-    ...(source.reactions ?? []).map((reaction) => ({
-      id: reaction.id, kind: "reaction" as const, label: reaction.name, instance: reaction.instance,
-      status: reaction.status, x: 0, y: 0, width: 0, height: 0,
-    })),
-  ];
-
-  const edges: Edge[] = (source.edges ?? []).map((edge) => ({
-    id: edge.id,
-    kind: (edge.kind as Edge["kind"]) ?? "connection",
-    source: edge.source,
-    target: edge.target,
-    delay: edge.delay ?? 0,
-  }));
-
+  const orderWithin = new Map<string, number>();
   return {
-    ...layout({ team: source.team ?? "", nodes, edges, width: 0, height: 0 }),
-    status: source.status,
-    tag: source.current_tag ?? null,
-  };
-}
-
-/**
- * Place nodes in columns by how far they are from something that starts.
- *
- * Longest-path layering: a node sits one column right of the furthest thing
- * that reaches it. It is what ELK's layered algorithm does at heart, and for a
- * dataflow graph it puts the picture in the order values travel — which is the
- * only thing the drawing has to get right to be worth looking at.
- */
-export function layout(topology: Topology): Topology {
-  const incoming = new Map<string, string[]>();
-  for (const node of topology.nodes) incoming.set(node.id, []);
-  for (const edge of topology.edges) {
-    if (incoming.has(edge.target)) incoming.get(edge.target)!.push(edge.source);
-  }
-
-  const depth = new Map<string, number>();
-  const visiting = new Set<string>();
-  const depthOf = (id: string): number => {
-    const known = depth.get(id);
-    if (known !== undefined) return known;
-    // A feedback loop has no furthest source; stopping at the first repeat
-    // keeps a ring from being infinitely deep.
-    if (visiting.has(id)) return 0;
-    visiting.add(id);
-    const sources = incoming.get(id) ?? [];
-    const value = sources.length === 0 ? 0 : Math.max(...sources.map(depthOf)) + 1;
-    visiting.delete(id);
-    depth.set(id, value);
-    return value;
-  };
-  for (const node of topology.nodes) depthOf(node.id);
-
-  const columns = new Map<number, Node[]>();
-  for (const node of topology.nodes) {
-    const column = depth.get(node.id) ?? 0;
-    if (!columns.has(column)) columns.set(column, []);
-    columns.get(column)!.push(node);
-  }
-
-  let width = 0;
-  let height = 0;
-  for (const [column, members] of [...columns.entries()].sort((a, b) => a[0] - b[0])) {
-    members.sort((a, b) => a.label.localeCompare(b.label));
-    members.forEach((node, index) => {
-      node.width = node.kind === "reaction" ? 150 : 130;
-      node.height = 30;
-      node.x = PADDING + column * COLUMN;
-      node.y = PADDING + index * ROW;
-      width = Math.max(width, node.x + node.width + PADDING);
-      height = Math.max(height, node.y + node.height + PADDING);
-    });
-  }
-
-  return { ...topology, width, height };
-}
-
-function bare(
-  id: string,
-  kind: Node["kind"],
-  label: string,
-  instruction: Instruction,
-  role?: string,
-): Node {
-  return {
-    id,
-    kind,
-    label,
-    instance: String(instruction["instance"] ?? ""),
-    ...(role ? { role } : {}),
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
+    protocol_version: 1,
+    team: program.team ?? "",
+    sequence: 0,
+    status: "ready",
+    current_tag: null,
+    lag: null,
+    instances: named("declare_instance").map((instance) => ({
+      id: `instance::${text(instance["name"])}`,
+      name: text(instance["name"]),
+      team: text(instance["team"]),
+      parent: instance["parent"] ? `instance::${text(instance["parent"])}` : "",
+    })),
+    agents: named("spawn_agent").map((agent) => ({
+      id: `agent::${text(agent["name"])}`,
+      name: text(agent["name"]),
+      backend: text(agent["backend"]),
+      instance: text(agent["instance"]),
+    })),
+    ports: named("define_port").map((port) => ({
+      id: `port::${text(port["name"])}`,
+      name: text(port["name"]),
+      kind: text(port["kind"]) as "input" | "output" | "action",
+      type: text(port["type"]),
+      delay: null,
+      value: null,
+      last_tag: null,
+      instance: text(port["instance"]),
+    })),
+    timers: named("declare_timer").map((timer) => ({
+      id: `timer::${text(timer["name"])}`,
+      name: text(timer["name"]),
+      offset: number(timer["offset"]),
+      period: number(timer["period"]),
+      last_tag: null,
+      instance: text(timer["instance"]),
+    })),
+    reactions: named("install_reaction").map((reaction) => {
+      const agent = text(reaction["agent"]);
+      const order = orderWithin.get(agent) ?? 0;
+      orderWithin.set(agent, order + 1);
+      return {
+        id: `reaction::${text(reaction["id"])}`,
+        name: text(reaction["id"]),
+        agent: `agent::${agent}`,
+        order,
+        // A trigger names a port or a timer, and the two have separate ids.
+        triggers: asStrings(reaction["triggers"]).map((trigger) => (timers.has(trigger) ? `timer::${trigger}` : `port::${trigger}`)),
+        effects: asStrings(reaction["effects"]).map((effect) => `port::${effect}`),
+        contract: text(reaction["contract"]),
+        status: "idle" as const,
+        invocation_id: null,
+        instance: text(reaction["instance"]),
+        within: typeof reaction["within"] === "number" ? reaction["within"] : null,
+      };
+    }),
+    edges: [
+      ...named("connect_ports").map((connection) => ({
+        id: `connection::${text(connection["source"])}::${text(connection["target"])}`,
+        kind: "connection" as const,
+        source: `port::${text(connection["source"])}`,
+        target: `port::${text(connection["target"])}`,
+        delay: typeof connection["delay"] === "number" ? connection["delay"] : null,
+      })),
+      ...named("install_reaction").flatMap((reaction) => {
+        const id = text(reaction["id"]);
+        return [
+          ...asStrings(reaction["triggers"]).map((trigger) => ({
+            id: `trigger::${trigger}::${id}`,
+            kind: "trigger" as const,
+            source: timers.has(trigger) ? `timer::${trigger}` : `port::${trigger}`,
+            target: `reaction::${id}`,
+            delay: null,
+          })),
+          ...asStrings(reaction["effects"]).map((effect) => ({
+            id: `effect::${id}::${effect}`,
+            kind: "effect" as const,
+            source: `reaction::${id}`,
+            target: `port::${effect}`,
+            delay: null,
+          })),
+        ];
+      }),
+    ],
   };
 }
 

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "team": "Timer",
+  "instructions": [
+    {"op": "begin_plan", "team": "Timer"},
+    {"op": "declare_instance", "name": "beacon", "parent": "", "team": "Beacon"},
+    {"op": "spawn_agent", "instance": "beacon", "name": "beacon.agent", "backend": "Codex"},
+    {"op": "define_port", "instance": "beacon", "kind": "output", "name": "beacon.note", "type": "string"},
+    {"op": "declare_timer", "instance": "beacon", "name": "beacon.t", "offset": 5, "period": 0},
+    {"op": "install_reaction", "instance": "beacon", "id": "beacon.reaction.0", "agent": "beacon.agent", "triggers": ["beacon.t"], "effects": ["beacon.note"], "contract": "beacon.note", "prompt": "\n        The beacon timer fired at logical time $(beacon.t).\n        Set `note` to exactly: fired at $(beacon.t)\n    "},
+    {"op": "commit_plan"}
+  ]
+}

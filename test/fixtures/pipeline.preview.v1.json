@@ -1,0 +1,317 @@
+{
+  "agents": [
+    {
+      "backend": "Stub",
+      "id": "agent::first.agent",
+      "instance": "first",
+      "name": "first.agent"
+    },
+    {
+      "backend": "Stub",
+      "id": "agent::judge.agent",
+      "instance": "judge",
+      "name": "judge.agent"
+    },
+    {
+      "backend": "Stub",
+      "id": "agent::second.agent",
+      "instance": "second",
+      "name": "second.agent"
+    },
+    {
+      "backend": "Stub",
+      "id": "agent::third.agent",
+      "instance": "third",
+      "name": "third.agent"
+    }
+  ],
+  "current_tag": null,
+  "edges": [
+    {
+      "delay": 4000000000,
+      "id": "connection::first.out::second.inp",
+      "kind": "connection",
+      "source": "port::first.out",
+      "target": "port::second.inp"
+    },
+    {
+      "delay": 8000000000,
+      "id": "connection::first.out::third.inp",
+      "kind": "connection",
+      "source": "port::first.out",
+      "target": "port::third.inp"
+    },
+    {
+      "delay": null,
+      "id": "connection::second.out::judge.left",
+      "kind": "connection",
+      "source": "port::second.out",
+      "target": "port::judge.left"
+    },
+    {
+      "delay": null,
+      "id": "connection::third.out::judge.right",
+      "kind": "connection",
+      "source": "port::third.out",
+      "target": "port::judge.right"
+    },
+    {
+      "delay": null,
+      "id": "trigger::first.inp::first.reaction.0",
+      "kind": "trigger",
+      "source": "port::first.inp",
+      "target": "reaction::first.reaction.0"
+    },
+    {
+      "delay": null,
+      "id": "effect::first.reaction.0::first.out",
+      "kind": "effect",
+      "source": "reaction::first.reaction.0",
+      "target": "port::first.out"
+    },
+    {
+      "delay": null,
+      "id": "trigger::judge.left::judge.reaction.0",
+      "kind": "trigger",
+      "source": "port::judge.left",
+      "target": "reaction::judge.reaction.0"
+    },
+    {
+      "delay": null,
+      "id": "trigger::judge.right::judge.reaction.0",
+      "kind": "trigger",
+      "source": "port::judge.right",
+      "target": "reaction::judge.reaction.0"
+    },
+    {
+      "delay": null,
+      "id": "effect::judge.reaction.0::judge.verdict",
+      "kind": "effect",
+      "source": "reaction::judge.reaction.0",
+      "target": "port::judge.verdict"
+    },
+    {
+      "delay": null,
+      "id": "trigger::second.inp::second.reaction.0",
+      "kind": "trigger",
+      "source": "port::second.inp",
+      "target": "reaction::second.reaction.0"
+    },
+    {
+      "delay": null,
+      "id": "effect::second.reaction.0::second.out",
+      "kind": "effect",
+      "source": "reaction::second.reaction.0",
+      "target": "port::second.out"
+    },
+    {
+      "delay": null,
+      "id": "trigger::third.inp::third.reaction.0",
+      "kind": "trigger",
+      "source": "port::third.inp",
+      "target": "reaction::third.reaction.0"
+    },
+    {
+      "delay": null,
+      "id": "effect::third.reaction.0::third.out",
+      "kind": "effect",
+      "source": "reaction::third.reaction.0",
+      "target": "port::third.out"
+    }
+  ],
+  "instances": [
+    {
+      "id": "instance::first",
+      "name": "first",
+      "parent": "",
+      "team": "Step"
+    },
+    {
+      "id": "instance::judge",
+      "name": "judge",
+      "parent": "",
+      "team": "Judge"
+    },
+    {
+      "id": "instance::second",
+      "name": "second",
+      "parent": "",
+      "team": "Step"
+    },
+    {
+      "id": "instance::third",
+      "name": "third",
+      "parent": "",
+      "team": "Step"
+    }
+  ],
+  "lag": null,
+  "ports": [
+    {
+      "delay": null,
+      "id": "port::first.inp",
+      "instance": "first",
+      "kind": "input",
+      "last_tag": null,
+      "name": "first.inp",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::first.out",
+      "instance": "first",
+      "kind": "output",
+      "last_tag": null,
+      "name": "first.out",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::judge.left",
+      "instance": "judge",
+      "kind": "input",
+      "last_tag": null,
+      "name": "judge.left",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::judge.right",
+      "instance": "judge",
+      "kind": "input",
+      "last_tag": null,
+      "name": "judge.right",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::judge.verdict",
+      "instance": "judge",
+      "kind": "output",
+      "last_tag": null,
+      "name": "judge.verdict",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::second.inp",
+      "instance": "second",
+      "kind": "input",
+      "last_tag": null,
+      "name": "second.inp",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::second.out",
+      "instance": "second",
+      "kind": "output",
+      "last_tag": null,
+      "name": "second.out",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::third.inp",
+      "instance": "third",
+      "kind": "input",
+      "last_tag": null,
+      "name": "third.inp",
+      "type": "int",
+      "value": null
+    },
+    {
+      "delay": null,
+      "id": "port::third.out",
+      "instance": "third",
+      "kind": "output",
+      "last_tag": null,
+      "name": "third.out",
+      "type": "int",
+      "value": null
+    }
+  ],
+  "protocol_version": 1,
+  "reactions": [
+    {
+      "agent": "agent::first.agent",
+      "contract": "first.out",
+      "effects": [
+        "port::first.out"
+      ],
+      "id": "reaction::first.reaction.0",
+      "instance": "first",
+      "invocation_id": null,
+      "name": "first.reaction.0",
+      "order": 0,
+      "status": "idle",
+      "triggers": [
+        "port::first.inp"
+      ],
+      "within": null
+    },
+    {
+      "agent": "agent::judge.agent",
+      "contract": "judge.verdict",
+      "effects": [
+        "port::judge.verdict"
+      ],
+      "id": "reaction::judge.reaction.0",
+      "instance": "judge",
+      "invocation_id": null,
+      "name": "judge.reaction.0",
+      "order": 3,
+      "status": "idle",
+      "triggers": [
+        "port::judge.left",
+        "port::judge.right"
+      ],
+      "within": null
+    },
+    {
+      "agent": "agent::second.agent",
+      "contract": "second.out",
+      "effects": [
+        "port::second.out"
+      ],
+      "id": "reaction::second.reaction.0",
+      "instance": "second",
+      "invocation_id": null,
+      "name": "second.reaction.0",
+      "order": 1,
+      "status": "idle",
+      "triggers": [
+        "port::second.inp"
+      ],
+      "within": null
+    },
+    {
+      "agent": "agent::third.agent",
+      "contract": "third.out",
+      "effects": [
+        "port::third.out"
+      ],
+      "id": "reaction::third.reaction.0",
+      "instance": "third",
+      "invocation_id": null,
+      "name": "third.reaction.0",
+      "order": 2,
+      "status": "idle",
+      "triggers": [
+        "port::third.inp"
+      ],
+      "within": null
+    }
+  ],
+  "sequence": 0,
+  "status": "ready",
+  "team": "Pipeline",
+  "timers": []
+}

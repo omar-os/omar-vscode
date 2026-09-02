@@ -1,8 +1,13 @@
 .github/**
 src/**
 test/**
+webview/**
+build/**
+vendor/**
 tsconfig.json
+tsconfig.webview.json
 eslint.config.mjs
 **/*.map
 .vscode-test/**
 docs/*.md
+.gitmodules
