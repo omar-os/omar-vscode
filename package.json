@@ -103,6 +103,26 @@
         "command": "omar.openEvidence",
         "title": "OMAR: Open Evidence",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "omar.connectDiagram",
+        "title": "OMAR: Follow a Diagram Server (Read Only)",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "omar.runProgram",
+        "title": "OMAR: Run Program",
+        "icon": "$(play)"
+      },
+      {
+        "command": "omar.stopDeployment",
+        "title": "OMAR: Stop Deployment",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "omar.killDeployment",
+        "title": "OMAR: Kill Deployment (Force)",
+        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -110,6 +130,11 @@
         {
           "command": "omar.showDiagram",
           "when": "resourceLangId == omar",
+          "group": "navigation"
+        },
+        {
+          "command": "omar.runProgram",
+          "when": "resourceLangId == omar && omar.canRun",
           "group": "navigation"
         }
       ],
@@ -143,6 +168,16 @@
           "command": "omar.clearHighlight",
           "when": "view == omar.guarantees",
           "group": "navigation"
+        },
+        {
+          "command": "omar.stopDeployment",
+          "when": "view == omar.summary && omar.canStop",
+          "group": "navigation@1"
+        },
+        {
+          "command": "omar.runProgram",
+          "when": "view == omar.deployments && omar.canRun",
+          "group": "navigation@4"
         }
       ],
       "commandPalette": [
@@ -161,6 +196,18 @@
         {
           "command": "omar.openEvidence",
           "when": "false"
+        },
+        {
+          "command": "omar.stopDeployment",
+          "when": "omar.canStop"
+        },
+        {
+          "command": "omar.killDeployment",
+          "when": "omar.canStop"
+        },
+        {
+          "command": "omar.runProgram",
+          "when": "omar.canRun"
         }
       ],
       "view/item/context": [
@@ -188,6 +235,11 @@
           "type": "string",
           "default": "~/.omar",
           "description": "The runtime's data directory on the machine VS Code's extension host runs on (the remote, under Remote SSH). Artifacts are read from `<dataDir>/ea/<ea>/topologies/<team>/`."
+        },
+        "omar.cliPath": {
+          "type": "string",
+          "default": "omar",
+          "description": "Path to the omar binary, used to stop or kill a deployment. Resolved on PATH when it is a bare name."
         },
         "omar.compilerPath": {
           "type": "string",

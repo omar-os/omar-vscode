@@ -49,6 +49,9 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
     const { live } = this.session.current;
     const status = statusOf(run, live);
     const rows: Row[] = [
+      ...(this.session.current.capabilities.readOnly
+        ? [{ label: "Access", value: "READ ONLY", icon: new vscode.ThemeIcon("lock"), tooltip: "This connection reaches only a diagram server, which has no way to change the run." }]
+        : []),
       { label: "Status", value: status.toUpperCase(), icon: runIcon(status) },
       { label: "Team", value: run.team },
       { label: "Run", value: run.run_id },

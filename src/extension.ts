@@ -4,6 +4,8 @@ import { compile } from "./omarc";
 import { fromBytecode, fromSnapshot, type Topology } from "./diagram";
 import { render } from "./webview";
 import { RuntimeSession } from "./runtime/RuntimeSession";
+import { isRunFinished } from "./client/protocol";
+import { normalizeRuntimeUrl } from "./client/OmarClient";
 import { DeploymentsProvider } from "./views/DeploymentsProvider";
 import { SummaryProvider } from "./views/SummaryProvider";
 import { TeamsProvider } from "./views/TeamsProvider";
@@ -11,6 +13,8 @@ import { StatusBar } from "./views/StatusBar";
 import { InspectorProvider, Selection } from "./views/Inspector";
 import { MissionControlPanel } from "./topology/MissionControlPanel";
 import type { Guarantee } from "./model/guarantees";
+import { runProgram, stopDeployment } from "./commands/operate";
+import { dataDir, workspaceFiles } from "./artifacts/files";
 import { ArtifactsProvider } from "./views/ArtifactsProvider";
 import { GuaranteesProvider } from "./views/GuaranteesProvider";
 import { EventsProvider } from "./views/EventsProvider";
@@ -88,6 +92,10 @@ export function deactivate(): void {}
  */
 function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const session = new RuntimeSession();
+  session.probe = async () => ({
+    cliPath: cliPath(),
+    artifactsReadable: (await workspaceFiles.stat(dataDir())) !== null,
+  });
   const deployments = new DeploymentsProvider(session);
   const artifacts = new ArtifactsProvider(session);
   const guarantees = new GuaranteesProvider(session, artifacts);
@@ -144,6 +152,9 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
     session.onDidChange((state) => {
       void vscode.commands.executeCommand("setContext", "omar.reach", state.reach);
       void vscode.commands.executeCommand("setContext", "omar.hasSelection", state.selected !== null);
+      void vscode.commands.executeCommand("setContext", "omar.canRun", state.capabilities.run);
+      void vscode.commands.executeCommand("setContext", "omar.canStop", state.capabilities.stop && state.live !== null && !isRunFinished(state.live.record.status));
+      void vscode.commands.executeCommand("setContext", "omar.readOnly", state.capabilities.readOnly);
       // A new run is a new picture; what was selected in the old one is gone.
       if (selection.current && !state.live?.snapshot) selection.set(null);
     }),
@@ -179,6 +190,21 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
       await session.connect(chosen);
     }),
     vscode.commands.registerCommand("omar.disconnect", () => session.disconnect()),
+    vscode.commands.registerCommand("omar.connectDiagram", async (url?: string) => {
+      const chosen =
+        url ??
+        (await vscode.window.showInputBox({
+          title: "Follow a diagram server (read only)",
+          prompt: "Address printed by omar run --diagram-server",
+          value: vscode.workspace.getConfiguration("omar").get<string>("diagramServerUrl", "") || "http://127.0.0.1:7341",
+        }));
+      if (chosen) await session.connectDiagram(chosen);
+    }),
+    vscode.commands.registerCommand("omar.runProgram", (uri?: vscode.Uri) =>
+      uri ? vscode.workspace.openTextDocument(uri).then((document) => runProgram(session, document)) : runProgram(session),
+    ),
+    vscode.commands.registerCommand("omar.stopDeployment", () => stopDeployment(session, cliPath(), false)),
+    vscode.commands.registerCommand("omar.killDeployment", () => stopDeployment(session, cliPath(), true)),
     vscode.commands.registerCommand("omar.refresh", () => session.refresh()),
     vscode.commands.registerCommand("omar.selectDeployment", async (runId?: string) => {
       if (runId) {
@@ -209,6 +235,10 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
           ? { label: "$(plug) Connect to runtime", command: "omar.connect" }
           : { label: "$(debug-disconnect) Disconnect", command: "omar.disconnect" },
         { label: "$(type-hierarchy) Open Mission Control", command: "omar.openMissionControl" },
+        ...(state.capabilities.run ? [{ label: "$(play) Run the open program", command: "omar.runProgram" }] : []),
+        ...(state.capabilities.stop && state.live && !isRunFinished(state.live.record.status)
+          ? [{ label: "$(debug-stop) Stop deployment", command: "omar.stopDeployment" }]
+          : []),
         { label: "$(list-selection) Select deployment", command: "omar.selectDeployment" },
         { label: "$(refresh) Refresh", command: "omar.refresh" },
       ];
@@ -219,9 +249,10 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
     }),
 
     vscode.workspace.onDidChangeConfiguration((change) => {
-      if (change.affectsConfiguration("omar.runtimeUrl") && session.current.reach !== "disconnected") {
-        void session.connect(configuredUrl());
-      }
+      if (!change.affectsConfiguration("omar.runtimeUrl") || session.current.reach === "disconnected") return;
+      // The Connect command writes the setting itself; that is not a change.
+      if (sameAddress(configuredUrl(), session.current.url)) return;
+      void session.connect(configuredUrl());
     }),
   );
 
@@ -229,6 +260,18 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   // daemon is shown as exactly that rather than as a prompt.
   void session.connect(configuredUrl());
   return { session, selection, panel, artifacts, guarantees };
+}
+
+function sameAddress(a: string, b: string | null): boolean {
+  try {
+    return b !== null && normalizeRuntimeUrl(a) === normalizeRuntimeUrl(b);
+  } catch {
+    return false;
+  }
+}
+
+function cliPath(): string {
+  return vscode.workspace.getConfiguration("omar").get<string>("cliPath", "omar");
 }
 
 function configuredUrl(): string {

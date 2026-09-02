@@ -1,5 +1,6 @@
 import {
   DIAGRAM_EVENT_KINDS,
+  parseCheckResult,
   parseDiagramEvent,
   parseDiagramSnapshot,
   parseHealth,
@@ -7,6 +8,7 @@ import {
   parseRunRecord,
   type DiagramEvent,
   type DiagramEventKind,
+  type CheckResult,
   type DiagramSnapshot,
   type Health,
   type RunRecord,
@@ -96,13 +98,22 @@ export class ServeClient {
     return getJson(`${this.url}/v1/runs/${encodeURIComponent(id)}`, signal).then(parseRunRecord);
   }
 
-  async startRun(request: RunRequest, signal?: AbortSignal): Promise<RunRecord> {
+  startRun(request: RunRequest, signal?: AbortSignal): Promise<RunRecord> {
+    return this.post("/v1/runs", request, signal).then(parseRunRecord);
+  }
+
+  /** Compile and verify a program without running it. `filename` must end in `.omar`. */
+  checkProgram(program: string, filename: string, signal?: AbortSignal): Promise<CheckResult> {
+    return this.post("/v1/programs/check", { program, filename }, signal).then(parseCheckResult);
+  }
+
+  private async post(path: string, body: unknown, signal?: AbortSignal): Promise<unknown> {
     let response: Response;
     try {
-      response = await fetch(`${this.url}/v1/runs`, {
+      response = await fetch(`${this.url}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(request),
+        body: JSON.stringify(body),
         signal,
       });
     } catch (cause) {
@@ -110,7 +121,7 @@ export class ServeClient {
       throw new RuntimeUnreachable(`Could not reach ${this.url}: ${describe(cause)}`);
     }
     if (!response.ok) throw new RuntimeRefused(response.status, await readError(response));
-    return parseRunRecord(await response.json());
+    return response.json();
   }
 }
 

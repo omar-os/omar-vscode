@@ -96,9 +96,47 @@ async function run() {
     await until(() => vscode.window.activeTextEditor?.document.uri.fsPath === log.path, "the log to open in an editor");
     assert.match(vscode.window.activeTextEditor.document.getText(), /hello from the watcher/);
 
+    // Capabilities are found out, not assumed: the daemon answers, so a run
+    // can be started; the CLI is not asked for here, so stopping is not offered.
+    await until(() => session.current.capabilities.run, "capabilities to be discovered: " + JSON.stringify(session.current.capabilities) + " reach=" + session.current.reach);
+    assert.equal(session.current.capabilities.readOnly, false);
+    assert.equal(session.current.capabilities.proofs, false);
+
+    // Running a program: the daemon checks it, the operator is asked for each
+    // open input, and the new run is selected.
+    const program = await vscode.workspace.openTextDocument({ language: "omar", content: "team T {}" });
+    const answers = ["7", "$(watch) Real time"];
+    const window = vscode.window;
+    const originalInput = window.showInputBox;
+    const originalPick = window.showQuickPick;
+    window.showInputBox = async (options) => {
+      assert.match(options.title, /src\.go : int/);
+      return answers.shift();
+    };
+    window.showQuickPick = async (items) => items.find((item) => item.label === answers.shift());
+    try {
+      await vscode.commands.executeCommand("omar.runProgram", program.uri);
+    } finally {
+      window.showInputBox = originalInput;
+      window.showQuickPick = originalPick;
+    }
+    assert.equal(stub.started.length, 1);
+    assert.deepEqual(stub.started[0].inputs, { "src.go": 7 });
+    assert.equal(stub.started[0].fast, false);
+    assert.equal(session.current.selected, "run-2");
+
     await vscode.commands.executeCommand("omar.disconnect");
     assert.equal(session.current.reach, "disconnected");
     assert.equal(session.current.live, null);
+
+    // A diagram server alone is read only by construction.
+    await vscode.commands.executeCommand("omar.connectDiagram", stub.url);
+    await until(() => session.current.reach === "connected" && session.current.live?.connection === "live", "the diagram-only picture to go live");
+    assert.equal(session.current.mode, "diagram");
+    assert.equal(session.current.capabilities.readOnly, true);
+    assert.equal(session.current.capabilities.run, false);
+    assert.equal(session.selectedRun.team, "program");
+    await vscode.commands.executeCommand("omar.disconnect");
   } finally {
     stub.close();
     // The test profile is reused by a developer's own runs; leave it as found.

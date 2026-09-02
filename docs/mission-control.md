@@ -100,6 +100,32 @@ The follower keeps every event it applied, with a note where the stream broke
 or a gap was filled from a snapshot. The Events view lists them newest
 first; a reaction's event inspects the reaction.
 
+## Operator controls and capabilities
+
+Every control is a call the runtime itself authorises; the extension decides
+nothing.
+
+- **Run program**: `POST /v1/programs/check` on the open `.omar` file, a
+  prompt per open input typed by its port, then `POST /v1/runs`. The daemon's
+  refusal is shown in its own words.
+- **Stop / Kill deployment**: `omar stop <team>` / `omar kill <team>` through
+  the CLI (`omar.cliPath`), which writes the stop request the runner reads.
+  The daemon has no HTTP route for this.
+- Not offered, because the runtime has no such operation: pause, resume,
+  retry, approve, reject.
+
+`src/runtime/capabilities.ts` finds out what a connection can do — the
+daemon answered, the CLI runs, the data directory is readable — and controls
+the runtime cannot honour are not shown. Hiding a button grants nothing: the
+runtime refuses what it refuses either way.
+
+**Read only** is a property of what a connection reaches, not a policy. The
+daemon's API has no permission mode, so the extension cannot offer one. But
+`OMAR: Follow a Diagram Server` connects to one run's diagram server alone
+(as `omar run --diagram-server` exposes it), and that surface has no way to
+change the run; the session is then read-only by construction and says so
+in the status bar and the Deployment view.
+
 ## What the runtime does not expose yet
 
 Kept out of the UI rather than faked:
@@ -107,7 +133,8 @@ Kept out of the UI rather than faked:
 - pause and resume (no such lifecycle state);
 - approvals;
 - sandboxes (agents share the daemon's working directory);
-- a read-only or permission mode (the API has no auth surface);
+- a permission mode (the API has no auth surface; read-only exists only as
+  the diagram-server-only connection above);
 - guarantees as a first-class list (the view shows a catalogue, and says so);
 - proofs (the Lean code is the compiler, not theorems).
 
