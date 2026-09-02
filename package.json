@@ -128,11 +128,6 @@
         "command": "omar.stopDeployment",
         "title": "OMAR: Stop Deployment",
         "icon": "$(debug-stop)"
-      },
-      {
-        "command": "omar.killDeployment",
-        "title": "OMAR: Kill Deployment (Force)",
-        "icon": "$(trash)"
       }
     ],
     "menus": {
@@ -212,10 +207,6 @@
           "when": "omar.canStop"
         },
         {
-          "command": "omar.killDeployment",
-          "when": "omar.canStop"
-        },
-        {
           "command": "omar.runProgram",
           "when": "omar.canRun"
         }
@@ -249,7 +240,7 @@
         "omar.cliPath": {
           "type": "string",
           "default": "omar",
-          "description": "Path to the omar binary, used to stop or kill a deployment. Resolved on PATH when it is a bare name."
+          "description": "Path to the omar binary, used to stop a deployment, and to start the runtime when none is running. Resolved on PATH when it is a bare name."
         },
         "omar.compilerPath": {
           "type": "string",

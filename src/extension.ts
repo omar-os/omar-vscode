@@ -206,8 +206,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
     vscode.commands.registerCommand("omar.runProgram", (uri?: vscode.Uri) =>
       uri ? vscode.workspace.openTextDocument(uri).then((document) => runProgram(session, document)) : runProgram(session),
     ),
-    vscode.commands.registerCommand("omar.stopDeployment", () => stopDeployment(session, cliPath(), false)),
-    vscode.commands.registerCommand("omar.killDeployment", () => stopDeployment(session, cliPath(), true)),
+    vscode.commands.registerCommand("omar.stopDeployment", () => stopDeployment(session, cliPath())),
     vscode.commands.registerCommand("omar.refresh", () => session.refresh()),
     vscode.commands.registerCommand("omar.selectDeployment", async (runId?: string) => {
       if (runId) {

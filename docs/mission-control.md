@@ -136,9 +136,10 @@ nothing.
 - **Run program**: `POST /v1/programs/check` on the open `.omar` file, a
   prompt per open input typed by its port, then `POST /v1/runs`. The daemon's
   refusal is shown in its own words.
-- **Stop / Kill deployment**: `omar stop <team>` / `omar kill <team>` through
-  the CLI (`omar.cliPath`), which writes the stop request the runner reads.
-  The daemon has no HTTP route for this.
+- **Stop deployment**: `omar stop <team>` through the CLI (`omar.cliPath`),
+  which writes the stop request the runner reads. The daemon has no HTTP
+  route for this. Not `omar kill`: for a run started through the daemon the
+  recorded runner pid is the daemon's own, so a kill takes the daemon down.
 - Not offered, because the runtime has no such operation: pause, resume,
   retry, approve, reject.
 
