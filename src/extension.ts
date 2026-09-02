@@ -10,11 +10,17 @@ import { TeamsProvider } from "./views/TeamsProvider";
 import { StatusBar } from "./views/StatusBar";
 import { InspectorProvider, Selection } from "./views/Inspector";
 import { MissionControlPanel } from "./topology/MissionControlPanel";
+import { ArtifactsProvider } from "./views/ArtifactsProvider";
 
 const LANGUAGE = "omar";
 
 /** What the extension hands back, so a test can watch the session it runs. */
-export type OmarApi = { session: RuntimeSession; selection: Selection; panel: MissionControlPanel };
+export type OmarApi = {
+  session: RuntimeSession;
+  selection: Selection;
+  panel: MissionControlPanel;
+  artifacts: ArtifactsProvider;
+};
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE);
@@ -85,7 +91,20 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const inspector = new InspectorProvider(session, selection);
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
   const panel = new MissionControlPanel(session, selection);
+  const artifacts = new ArtifactsProvider(session);
   context.subscriptions.push(
+    artifacts,
+    vscode.window.registerTreeDataProvider("omar.artifacts", artifacts),
+    vscode.commands.registerCommand("omar.revealArtifacts", async () => {
+      const directory = artifacts.current?.directory;
+      if (!directory) {
+        vscode.window.showInformationMessage("The runtime has not written a directory for this deployment.");
+        return;
+      }
+      await vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(directory)).then(undefined, () =>
+        vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(directory)),
+      );
+    }),
     session,
     deployments,
     summary,
@@ -185,7 +204,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   // Connect on activation: the address has a default, and an unreachable
   // daemon is shown as exactly that rather than as a prompt.
   void session.connect(configuredUrl());
-  return { session, selection, panel };
+  return { session, selection, panel, artifacts };
 }
 
 function configuredUrl(): string {

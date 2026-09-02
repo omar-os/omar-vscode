@@ -83,6 +83,11 @@
         "command": "omar.openMissionControl",
         "title": "OMAR: Open Mission Control",
         "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "omar.revealArtifacts",
+        "title": "OMAR: Reveal Deployment Files",
+        "icon": "$(folder-opened)"
       }
     ],
     "menus": {
@@ -113,6 +118,11 @@
           "command": "omar.disconnect",
           "when": "view == omar.deployments && omar.reach != 'disconnected'",
           "group": "navigation@3"
+        },
+        {
+          "command": "omar.revealArtifacts",
+          "when": "view == omar.artifacts && omar.hasSelection",
+          "group": "navigation"
         }
       ],
       "commandPalette": [
@@ -133,6 +143,11 @@
           "type": "string",
           "default": "http://127.0.0.1:7340",
           "description": "Address of `omar serve`, the daemon Mission Control reads deployments from."
+        },
+        "omar.dataDir": {
+          "type": "string",
+          "default": "~/.omar",
+          "description": "The runtime's data directory on the machine VS Code's extension host runs on (the remote, under Remote SSH). Artifacts are read from `<dataDir>/ea/<ea>/topologies/<team>/`."
         },
         "omar.compilerPath": {
           "type": "string",
@@ -182,6 +197,11 @@
           "id": "omar.inspector",
           "name": "Inspector",
           "icon": "media/omar.svg"
+        },
+        {
+          "id": "omar.artifacts",
+          "name": "Artifacts",
+          "icon": "media/omar.svg"
         }
       ]
     },
@@ -220,6 +240,11 @@
         "view": "omar.inspector",
         "contents": "Click an agent, reaction, port or team in the topology or the Teams view to inspect it.",
         "when": "!omar.inspecting"
+      },
+      {
+        "view": "omar.artifacts",
+        "contents": "No deployment selected.",
+        "when": "!omar.hasSelection"
       }
     ]
   },
