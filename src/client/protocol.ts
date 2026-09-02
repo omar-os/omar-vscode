@@ -390,3 +390,23 @@ export function applyDiagramEvent(snapshot: DiagramSnapshot, event: DiagramEvent
       };
   }
 }
+
+/** What `/v1/programs/check` says about a program. */
+export type CheckResult =
+  | { ok: true; openInputs: string[]; preview: DiagramSnapshot }
+  | { ok: false; errors: string[] };
+
+export function parseCheckResult(value: unknown): CheckResult {
+  if (!isRecord(value) || typeof value["ok"] !== "boolean") {
+    throw new ProtocolError("Check response is not from an OMAR runtime.");
+  }
+  if (!value["ok"]) {
+    const errors = Array.isArray(value["errors"]) ? value["errors"].map(String) : ["The program was refused."];
+    return { ok: false, errors };
+  }
+  return {
+    ok: true,
+    openInputs: Array.isArray(value["open_inputs"]) ? value["open_inputs"].map(String) : [],
+    preview: parseDiagramSnapshot(value["preview"]),
+  };
+}

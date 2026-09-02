@@ -37,7 +37,8 @@ export class StatusBar implements vscode.Disposable {
           }
           const status = statusOf(run, state.live).toUpperCase();
           const stale = state.live?.connection === "stale";
-          this.item.text = `$(pulse) OMAR: ${run.team} ${status}${stale ? " (STALE)" : ""}`;
+          const readOnly = state.capabilities.readOnly ? " · READ ONLY" : "";
+          this.item.text = `$(pulse) OMAR: ${run.team} ${status}${stale ? " (STALE)" : ""}${readOnly}`;
           this.item.tooltip = `${state.url}\n${run.run_id}\n${state.live?.detail ?? ""}`;
           if (stale) this.item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
           break;

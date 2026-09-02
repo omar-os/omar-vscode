@@ -20,18 +20,38 @@ function start() {
     finished_at: null,
     error: null,
   };
+  const started = [];
   const server = createServer((request, response) => {
     const json = (status, body) => {
       response.writeHead(status, { "content-type": "application/json", connection: "close" });
       response.end(JSON.stringify(body));
     };
+    if (request.method === "POST") {
+      let body = "";
+      request.on("data", (chunk) => (body += chunk));
+      request.on("end", () => {
+        const parsed = JSON.parse(body);
+        if (request.url === "/v1/programs/check") {
+          if (!parsed.program.includes("team")) return json(200, { ok: false, errors: ["expected a team"] });
+          return json(200, { ok: true, open_inputs: ["src.go"], preview: JSON.parse(SNAPSHOT) });
+        }
+        if (request.url === "/v1/runs") {
+          started.push(parsed);
+          return json(201, { ...record, run_id: "run-2", started_at: record.started_at + 1 });
+        }
+        json(404, { error: "not found" });
+      });
+      return;
+    }
     switch (request.url) {
       case "/health":
         return json(200, { status: "ok", protocol_version: 1 });
       case "/v1/runs":
-        return json(200, { runs: [record] });
+        return json(200, { runs: [record, ...started.map((_, index) => ({ ...record, run_id: `run-${index + 2}`, started_at: record.started_at + 1 }))] });
       case "/v1/runs/run-1":
         return json(200, record);
+      case "/v1/runs/run-2":
+        return json(200, { ...record, run_id: "run-2", started_at: record.started_at + 1 });
       case "/v1/diagram":
         response.writeHead(200, { "content-type": "application/json" });
         return response.end(SNAPSHOT);
@@ -52,7 +72,7 @@ function start() {
     server.listen(0, "127.0.0.1", () => {
       const url = `http://127.0.0.1:${server.address().port}`;
       record.diagram_address = `127.0.0.1:${server.address().port}`;
-      resolve({ url, close: () => server.close() });
+      resolve({ url, started, close: () => server.close() });
     });
   });
 }
