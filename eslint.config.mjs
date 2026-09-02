@@ -4,7 +4,15 @@ import tseslint from "typescript-eslint";
 export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  { ignores: ["out/**", "node_modules/**"] },
+  { ignores: ["out/**", "node_modules/**", "vendor/**", "media/**"] },
+  {
+    files: ["webview/**/*.tsx", "webview/**/*.ts"],
+    languageOptions: { globals: { window: "readonly", document: "readonly", setInterval: "readonly", clearInterval: "readonly", acquireVsCodeApi: "readonly", MessageEvent: "readonly", HTMLDivElement: "readonly" } },
+  },
+  {
+    files: ["build/**/*.mjs"],
+    languageOptions: { globals: { console: "readonly", URL: "readonly" } },
+  },
   {
     files: ["test/**/*.mjs", "test/**/*.js"],
     languageOptions: {

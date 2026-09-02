@@ -18,10 +18,11 @@ what it is running:
   lag, guarantees at a glance, and whether the picture is **LIVE**, **STALE**
   (the event stream broke; what is shown is what was last known) or
   **FINAL**.
-- **Mission Control** panel — the topology as the runtime describes it:
-  instances as nested boxes, ports, timers and reactions inside them, edges
-  between them, each reaction carrying its state as it changes. Pan, zoom,
-  click anything to inspect it.
+- **Mission Control** panel — the topology, drawn by the very component the
+  web Mission Control draws it with (vendored from the omar repository and
+  bundled into the webview): teams as containers, ports on their boundary,
+  reactions as chevrons, timers as clocks, each reaction carrying its state
+  as it changes. Pan, zoom, click anything to inspect it.
 - **Teams** — instances, their agents, and each agent's reactions with their
   real states.
 - **Inspector** — what the runtime knows about the selected thing: a
@@ -111,8 +112,9 @@ would make this exact, and that is where the fix belongs.
 ## Building it
 
 ```bash
+git submodule update --init   # the web app's diagram, vendored from omar
 npm install
-npm run build
+npm run build                 # tsc, then the webview bundle into media/webview/
 npm test              # skips the compiler tests when omarc is not built
 npm run lint
 npm run test:vscode   # a real VS Code against a stub runtime; needs a display or xvfb-run

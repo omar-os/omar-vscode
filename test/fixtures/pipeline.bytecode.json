@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "team": "Pipeline",
+  "instructions": [
+    {"op": "begin_plan", "team": "Pipeline"},
+    {"op": "declare_instance", "name": "first", "parent": "", "team": "Step"},
+    {"op": "declare_instance", "name": "second", "parent": "", "team": "Step"},
+    {"op": "declare_instance", "name": "third", "parent": "", "team": "Step"},
+    {"op": "declare_instance", "name": "judge", "parent": "", "team": "Judge"},
+    {"op": "spawn_agent", "instance": "first", "name": "first.agent", "backend": "Stub"},
+    {"op": "spawn_agent", "instance": "second", "name": "second.agent", "backend": "Stub"},
+    {"op": "spawn_agent", "instance": "third", "name": "third.agent", "backend": "Stub"},
+    {"op": "spawn_agent", "instance": "judge", "name": "judge.agent", "backend": "Stub"},
+    {"op": "define_port", "instance": "first", "kind": "input", "name": "first.inp", "type": "int"},
+    {"op": "define_port", "instance": "first", "kind": "output", "name": "first.out", "type": "int"},
+    {"op": "define_port", "instance": "second", "kind": "input", "name": "second.inp", "type": "int"},
+    {"op": "define_port", "instance": "second", "kind": "output", "name": "second.out", "type": "int"},
+    {"op": "define_port", "instance": "third", "kind": "input", "name": "third.inp", "type": "int"},
+    {"op": "define_port", "instance": "third", "kind": "output", "name": "third.out", "type": "int"},
+    {"op": "define_port", "instance": "judge", "kind": "input", "name": "judge.left", "type": "int"},
+    {"op": "define_port", "instance": "judge", "kind": "input", "name": "judge.right", "type": "int"},
+    {"op": "define_port", "instance": "judge", "kind": "output", "name": "judge.verdict", "type": "int"},
+    {"op": "connect_ports", "source": "first.out", "target": "second.inp", "delay": 4000000000},
+    {"op": "connect_ports", "source": "first.out", "target": "third.inp", "delay": 8000000000},
+    {"op": "connect_ports", "source": "second.out", "target": "judge.left"},
+    {"op": "connect_ports", "source": "third.out", "target": "judge.right"},
+    {"op": "install_reaction", "instance": "first", "id": "first.reaction.0", "agent": "first.agent", "triggers": ["first.inp"], "effects": ["first.out"], "contract": "first.out", "prompt": "\n        Set `out` to $(first.inp) plus 1.\n    "},
+    {"op": "install_reaction", "instance": "second", "id": "second.reaction.0", "agent": "second.agent", "triggers": ["second.inp"], "effects": ["second.out"], "contract": "second.out", "prompt": "\n        Set `out` to $(second.inp) plus 1.\n    "},
+    {"op": "install_reaction", "instance": "third", "id": "third.reaction.0", "agent": "third.agent", "triggers": ["third.inp"], "effects": ["third.out"], "contract": "third.out", "prompt": "\n        Set `out` to $(third.inp) plus 1.\n    "},
+    {"op": "install_reaction", "instance": "judge", "id": "judge.reaction.0", "agent": "judge.agent", "triggers": ["judge.left","judge.right"], "effects": ["judge.verdict"], "contract": "judge.verdict", "prompt": "\n        Set `verdict` to $(judge.left) plus $(judge.right).\n    "},
+    {"op": "commit_plan"}
+  ]
+}

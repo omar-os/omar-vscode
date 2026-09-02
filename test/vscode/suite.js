@@ -60,15 +60,17 @@ async function run() {
     assert.equal(watch.status, "running", "the streamed event reached the picture");
     assert.equal(session.current.live.sequence, 11);
 
-    // The topology panel draws the same picture, and a click in it inspects.
+    // The topology panel is the web app's own diagram, bundled: it is handed
+    // the snapshot, and it reports back what it drew once ELK has laid it out.
     await vscode.commands.executeCommand("omar.openMissionControl");
-    const drawn = panel.state();
-    assert.equal(drawn.connection, "live");
-    assert.ok(drawn.graph.nodes.some((node) => node.id === "reaction::watch.reaction.0" && node.status === "running"));
-    assert.equal(drawn.graph.boxes.length, 4, "one box per instance");
+    assert.equal(panel.state().connection, "live");
+    assert.equal(panel.state().snapshot.reactions.find((reaction) => reaction.id === "reaction::watch.reaction.0").status, "running");
+    await until(() => panel.drawn !== null, "the diagram to report what it drew", 30_000);
+    assert.equal(panel.drawn.error, null, "the diagram drew without error");
+    assert.ok(panel.drawn.nodes >= 13, `the diagram drew its nodes (${panel.drawn.nodes})`);
     await vscode.commands.executeCommand("omar.inspect", "reaction::watch.reaction.0");
     assert.equal(selection.current, "reaction::watch.reaction.0");
-    assert.equal(panel.state().selected, "reaction::watch.reaction.0");
+    assert.deepEqual(panel.state().selection, ["watch.reaction.0"], "the diagram selects by component name");
 
     // Guarantees: precise statuses, nothing proven, and one inspects like a node.
     const listed = guarantees.current();
@@ -81,7 +83,7 @@ async function run() {
     await vscode.commands.executeCommand("omar.showOnTopology", guarantees.find("declared-effects"));
     assert.equal(panel.state().highlight.length, 4, "every reaction is brought forward");
     await vscode.commands.executeCommand("omar.clearHighlight");
-    assert.equal(panel.state().highlight.length, 0);
+    assert.equal(panel.state().highlight, null);
 
     // Events: the streamed transition is in the log.
     assert.ok(session.current.live.log.some((entry) => entry.kind === "event" && entry.event.kind === "reaction_started"));

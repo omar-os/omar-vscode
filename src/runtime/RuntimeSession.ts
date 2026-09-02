@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 
 import { followRun, type LiveRun } from "../client/follow";
 import { DiagramClient, ServeClient, diagramUrlFor, RuntimeRefused } from "../client/OmarClient";
-import { isRunFinished, type DiagramSnapshot, type RunRecord } from "../client/protocol";
+import { isRunFinished, type RunRecord } from "../client/protocol";
+import { diagramOnlySource } from "../client/diagramOnly";
 import { discover, NONE, type Capabilities } from "./capabilities";
 
 /**
@@ -88,26 +89,17 @@ export class RuntimeSession implements vscode.Disposable {
    */
   async connectDiagram(url: string): Promise<void> {
     this.disconnect();
-    let diagram: DiagramClient;
+    let only: ReturnType<typeof diagramOnlySource>;
     try {
-      diagram = new DiagramClient(url);
+      only = diagramOnlySource(url);
     } catch (cause) {
       this.set({ url, reach: "unreachable", problem: describe(cause) });
       return;
     }
-    this.set({ url: diagram.url, reach: "connecting", problem: null, runs: [], selected: null, live: null, mode: "diagram", capabilities: NONE });
-    const recordOf = (snapshot: DiagramSnapshot): RunRecord => ({
-      run_id: `diagram:${diagram.url}`,
-      team: snapshot.team,
-      status: snapshot.status === "completed" ? "completed" : snapshot.status === "failed" ? "failed" : "running",
-      diagram_address: diagram.url.replace(/^https?:\/\//, ""),
-      started_at: 0,
-      finished_at: null,
-      error: null,
-    });
+    this.set({ url: only.client.url, reach: "connecting", problem: null, runs: [], selected: null, live: null, mode: "diagram", capabilities: NONE });
     let record: RunRecord;
     try {
-      record = recordOf(await diagram.snapshot());
+      record = only.recordOf(await only.client.snapshot());
     } catch (cause) {
       this.set({ reach: "unreachable", problem: describe(cause) });
       return;
@@ -118,11 +110,7 @@ export class RuntimeSession implements vscode.Disposable {
     this.following = abort;
     void followRun(
       record,
-      {
-        record: async (signal) => recordOf(await diagram.snapshot(signal)),
-        snapshot: (signal) => diagram.snapshot(signal),
-        events: (signal) => diagram.events(signal),
-      },
+      only.source,
       {
         onChange: (live) => {
           if (abort.signal.aborted) return;

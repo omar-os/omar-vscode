@@ -1,11 +1,14 @@
 import * as vscode from "vscode";
 
 import { compile } from "./omarc";
-import { fromBytecode, fromSnapshot, type Topology } from "./diagram";
-import { render } from "./webview";
+import { fromBytecode } from "./diagram";
+import { diagramOnlySource } from "./client/diagramOnly";
+import { followRun } from "./client/follow";
+import { DiagramWebview } from "./topology/DiagramWebview";
 import { RuntimeSession } from "./runtime/RuntimeSession";
 import { isRunFinished } from "./client/protocol";
 import { normalizeRuntimeUrl } from "./client/OmarClient";
+import { formatNanos, formatTag } from "./model/format";
 import { DeploymentsProvider } from "./views/DeploymentsProvider";
 import { SummaryProvider } from "./views/SummaryProvider";
 import { TeamsProvider } from "./views/TeamsProvider";
@@ -105,7 +108,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const selection = new Selection();
   const inspector = new InspectorProvider(session, selection, guarantees);
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
-  const panel = new MissionControlPanel(session, selection);
+  const panel = new MissionControlPanel(context.extensionUri, session, selection);
   context.subscriptions.push(
     artifacts,
     guarantees,
@@ -325,12 +328,13 @@ async function check(
 /**
  * The diagram windows, one per program.
  *
- * A panel shows the compiled topology, and follows a run when one is reachable:
- * the same picture either way, with the running one carrying what is happening
- * on top of what exists.
+ * A panel shows the compiled program the way the daemon's preview would draw
+ * it, and follows a run when one is listening at `omar.diagramServerUrl`: the
+ * same diagram either way, the running one carrying what is happening on top
+ * of what exists.
  */
 class DiagramPanels implements vscode.Disposable {
-  private readonly panels = new Map<string, vscode.WebviewPanel>();
+  private readonly panels = new Map<string, DiagramWebview>();
   private readonly streams = new Map<string, AbortController>();
 
   constructor(
@@ -342,20 +346,20 @@ class DiagramPanels implements vscode.Disposable {
     const key = document.uri.toString();
     let panel = this.panels.get(key);
     if (!panel) {
-      panel = vscode.window.createWebviewPanel(
+      panel = new DiagramWebview(
+        this.context.extensionUri,
         "omar.diagram",
         `Topology · ${basename(document)}`,
-        vscode.ViewColumn.Beside,
-        { enableScripts: true, retainContextWhenHidden: true },
+        () => {},
+        () => {
+          this.panels.delete(key);
+          this.streams.get(key)?.abort();
+          this.streams.delete(key);
+        },
       );
-      panel.onDidDispose(() => {
-        this.panels.delete(key);
-        this.streams.get(key)?.abort();
-        this.streams.delete(key);
-      }, null, this.context.subscriptions);
       this.panels.set(key, panel);
     }
-    panel.reveal(vscode.ViewColumn.Beside, true);
+    panel.show(vscode.ViewColumn.Beside, true);
     await this.refresh(document);
   }
 
@@ -370,76 +374,58 @@ class DiagramPanels implements vscode.Disposable {
       basename(document),
     );
     if (!result.ok) {
-      panel.webview.html = render(null, result.problems.map((problem) => problem.message));
+      panel.post({
+        snapshot: null, selection: [], highlight: null, team: basename(document), status: "", connection: null,
+        detail: null, tag: "", lag: "", empty: `Does not compile:\n${result.problems.map((problem) => problem.message).join("\n")}`,
+      });
       return;
     }
-
-    const topology = fromBytecode(result.bytecode);
-    panel.webview.html = render(topology, []);
-    await this.follow(key, panel, topology);
+    const compiled = fromBytecode(result.bytecode);
+    panel.post({
+      snapshot: compiled, selection: [], highlight: null, team: compiled.team, status: "", connection: "compiled",
+      detail: null, tag: "", lag: "", empty: null,
+    });
+    await this.follow(key, panel, compiled.team);
   }
 
   /**
-   * Follow a running topology, if one is listening.
-   *
-   * The diagram server streams what is happening; a snapshot is fetched first
-   * because the stream does not replay what it has already sent. When nothing
-   * is there the panel keeps the compiled picture, which is the honest thing to
-   * show: the program exists, it just is not running.
+   * Follow a running topology, if one is listening. When nothing is there the
+   * panel keeps the compiled picture, which is the honest thing to show: the
+   * program exists, it just is not running.
    */
-  private async follow(key: string, panel: vscode.WebviewPanel, compiled: Topology): Promise<void> {
+  private async follow(key: string, panel: DiagramWebview, team: string): Promise<void> {
     this.streams.get(key)?.abort();
-    const url = vscode.workspace
-      .getConfiguration("omar")
-      .get<string>("diagramServerUrl", "")
-      .replace(/\/$/, "");
+    const url = vscode.workspace.getConfiguration("omar").get<string>("diagramServerUrl", "");
     if (!url) return;
-
     const abort = new AbortController();
     this.streams.set(key, abort);
-
     try {
-      const response = await fetch(`${url}/v1/diagram`, { signal: abort.signal });
-      if (!response.ok) return;
-      const snapshot = fromSnapshot(await response.json());
-      if (snapshot.team !== compiled.team) {
-        // A different program is running. Saying so beats quietly drawing it as
-        // if it were the file on screen.
-        void panel.webview.postMessage({ kind: "other-run", team: snapshot.team });
+      const { source, recordOf, client } = diagramOnlySource(url);
+      const snapshot = await client.snapshot(abort.signal);
+      if (snapshot.team !== team) {
+        // A different program is running. Saying so beats quietly drawing it
+        // as if it were the file on screen.
+        panel.post({
+          snapshot: null, selection: [], highlight: null, team, status: "", connection: null, detail: null, tag: "", lag: "",
+          empty: `A different program is running at ${client.url}: ${snapshot.team}.`,
+        });
         return;
       }
-      void panel.webview.postMessage({ kind: "topology", topology: snapshot });
-      void this.stream(url, panel, abort);
+      void followRun(
+        recordOf(snapshot),
+        source,
+        {
+          onChange: (live) =>
+            panel.post({
+              snapshot: live.snapshot, selection: [], highlight: null, team, status: live.record.status,
+              connection: live.connection, detail: live.detail,
+              tag: live.snapshot ? formatTag(live.snapshot.current_tag) : "", lag: live.snapshot ? formatNanos(live.snapshot.lag) : "", empty: null,
+            }),
+        },
+        abort.signal,
+      );
     } catch {
       // Not running, or not reachable. The compiled picture stands.
-    }
-  }
-
-  /** Re-fetch on every event: the snapshot is small and always complete. */
-  private async stream(
-    url: string,
-    panel: vscode.WebviewPanel,
-    abort: AbortController,
-  ): Promise<void> {
-    try {
-      const events = await fetch(`${url}/v1/events`, { signal: abort.signal });
-      const body = events.body;
-      if (!body) return;
-      const reader = body.getReader();
-      const decoder = new TextDecoder();
-      while (!abort.signal.aborted) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!decoder.decode(value, { stream: true }).includes("event:")) continue;
-        const response = await fetch(`${url}/v1/diagram`, { signal: abort.signal });
-        if (!response.ok) break;
-        void panel.webview.postMessage({
-          kind: "topology",
-          topology: fromSnapshot(await response.json()),
-        });
-      }
-    } catch {
-      // The server shuts down with the run, which is an ordinary ending.
     }
   }
 

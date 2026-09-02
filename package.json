@@ -371,9 +371,9 @@
     ]
   },
   "scripts": {
-    "build": "tsc -p .",
+    "build": "tsc -p . && tsc -p tsconfig.webview.json && node build/webview.mjs",
     "watch": "tsc -p . --watch",
-    "lint": "eslint src test",
+    "lint": "eslint src test webview build",
     "test": "npm run build && node --test test/*.test.mjs",
     "vscode:prepublish": "npm run build",
     "test:vscode": "npm run build && node test/vscode/run.mjs"
@@ -381,11 +381,17 @@
   "devDependencies": {
     "@eslint/js": "^9.39.5",
     "@types/node": "^20.14.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vscode/test-electron": "^2.5.2",
+    "elkjs": "^0.12.0",
+    "esbuild": "^0.25.12",
     "eslint": "^9.9.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.66.0"
   }

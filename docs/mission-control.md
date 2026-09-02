@@ -52,6 +52,34 @@ agent's `instance` is a name.
 `connection` is one of `connecting`, `live`, `stale`, `final`. A view must
 show it. Cached state is never presented as live.
 
+## The diagram is the web app's
+
+The topology panel renders `DiagramCanvas` from the web app — the same
+React component `omar serve --ui` draws, over the same ELK layout, with the
+same stylesheet — not a drawing of the extension's own. The omar repository
+is vendored as a git submodule at `vendor/omar`, pinned to a commit, and
+`build/webview.mjs` bundles `webview/main.tsx` (which mounts the component
+and relays messages) with React and ELK into `media/webview/diagram.js`,
+cutting the diagram's section of `web/app/globals.css` into
+`media/webview/diagram.css`. A moved marker in that stylesheet fails the
+build rather than shipping a diagram without its styles.
+
+The extension posts the whole state to the page on every change — snapshot,
+selection (by component name, which is how the diagram selects), highlight
+(by id), and the header's words — and the page hands the snapshot to the
+component. Clicks come back as component names and are mapped to ids for
+the inspector (`src/topology/components.ts`). After ELK settles, the page
+reports how many nodes it drew, which is what the headless VS Code run
+checks.
+
+`OMAR: Show topology diagram` for a file draws the same component from a
+snapshot read off the bytecode (`src/diagram.ts`), which is tested to equal
+the daemon's own `/v1/programs/check` preview for the same program.
+
+To move to a newer web diagram: `git -C vendor/omar checkout <commit>`,
+`npm run build`, and commit the submodule pointer. Clone with
+`--recurse-submodules`, or run `git submodule update --init`.
+
 ## Artifacts (`src/artifacts/`)
 
 The daemon serves none of a run's files. It writes them under its data
