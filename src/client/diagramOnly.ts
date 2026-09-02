@@ -25,7 +25,7 @@ export function diagramOnlySource(url: string): { client: DiagramClient; recordO
     source: {
       record: async (signal) => recordOf(await client.snapshot(signal)),
       snapshot: (signal) => client.snapshot(signal),
-      events: (signal) => client.events(signal),
+      events: (signal, onOpen) => client.events(signal, onOpen),
     },
   };
 }

@@ -141,7 +141,7 @@ export class DiagramClient {
    * The event stream, as it arrives. Ends when the server closes it, which it
    * does when the run ends; throws when the connection breaks before that.
    */
-  async *events(signal?: AbortSignal): AsyncGenerator<DiagramEvent> {
+  async *events(signal?: AbortSignal, onOpen?: () => void): AsyncGenerator<DiagramEvent> {
     let response: Response;
     try {
       response = await fetch(`${this.url}/v1/events`, {
@@ -155,6 +155,9 @@ export class DiagramClient {
     if (!response.ok || !response.body) {
       throw new RuntimeRefused(response.status, await readError(response));
     }
+    // Open is live, even before anything happens: a run waiting out a delay
+    // sends nothing for a while, and its picture is current all the same.
+    onOpen?.();
     for await (const frame of readSse(response.body, signal)) {
       if (!frame.event || !DIAGRAM_EVENT_KINDS.includes(frame.event as DiagramEventKind)) continue;
       yield parseDiagramEvent(JSON.parse(frame.data));

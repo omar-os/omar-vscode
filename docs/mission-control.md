@@ -128,12 +128,55 @@ The follower keeps every event it applied, with a note where the stream broke
 or a gap was filled from a snapshot. The Events view lists them newest
 first; a reaction's event inspects the reaction.
 
+## The assistant (`src/chat/`, `src/client/chat.ts`)
+
+The daemon's chat: `POST /v1/chat` `{text, selection}` (202 with the
+operator's message; 502 in the daemon's words when no assistant is
+running), `GET /v1/chat/events` (SSE, `message` and `design_proposed`
+events; the whole backlog is replayed on every connection), `GET /v1/agent`
+(the backend the assistant runs on), `POST /v1/agent/backend` (relaunch it).
+A proposal is an assistant message with `design: {program, inputs,
+preview}`; the daemon compiled the program before relaying it.
+
+`Thread` (no vscode import) places each message by sequence so a replay
+changes nothing, holds `drafting` from the operator's message until an
+assistant message that is not `progress`, and reconnects a broken stream.
+`ChatView` mounts the web app's `ChatMessage` component (react-markdown, so
+model output is never injected as HTML) in a webview view in its own panel
+container, so the thread has the room a conversation needs; the composer,
+selection bar and proposal buttons are the studio's chrome, kept to what the
+extension has a use for.
+
+**What the assistant can see.** A chat message reaches the assistant as its
+text plus the selected component names, and no tool of the assistant's reads
+a run. So, with `omar.attachDeploymentContext` on and a deployment selected,
+`deploymentContext` puts in front of the operator's words a bounded block
+built only from the runtime's own answers: status and elapsed time, each
+reaction's state and agent, the port values, the last dozen events, the
+guarantees, and the files on this machine. It is marked as the runtime's,
+not the operator's, and the view shows only the operator's words. That is
+how the assistant "monitors" a deployment today; a channel that pushes run
+events to the assistant belongs in the runtime.
+
+**Proposals.** Preview shows the compiled preview in the diagram panel, in
+place of the run, marked PROPOSAL until cleared. Open program opens the
+source as an `.omar` document. Deploy asks for any open input the assistant
+left out, then `POST /v1/runs` with the assistant's program and inputs, and
+selects the run. The operator deploys; the assistant never does.
+
+**No assistant.** A daemon started with `--no-ea` refuses chat with "the
+executive assistant is not running"; the view shows that and, when the
+extension started the runtime, offers to restart it with one. A daemon that
+found an assistant launched before it prints that it "cannot reply or
+propose designs"; the launcher relays the line and the view offers to
+restart the assistant (`POST /v1/agent/backend`), which loses its session.
+
 ## Starting the runtime
 
 `src/runtime/serve.ts` and `RuntimeLauncher.ts`. When a connect attempt
 finds nothing answering at a loopback `omar.runtimeUrl`, the session asks the
 launcher for a daemon: `omar serve --address host:port` plus
-`omar.serveArguments` (default `--no-ea`), spawned as a child of the
+`omar.serveArguments` (default `--restart-ea`: the assistant is started fresh, since one from an earlier runtime holds that runtime's token and cannot answer through this one), spawned as a child of the
 extension host with `OMARC_BIN` set when `omar.compilerPath` is a path. The
 session shows **starting** until `/health` answers (20s at most), then
 connects. Output goes to the **OMAR Runtime** output channel. The poll tries

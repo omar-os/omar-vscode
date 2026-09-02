@@ -14,6 +14,15 @@ import { serveSpec, startServe, waitFor, type ServeHandle } from "./serve";
  */
 export class RuntimeLauncher implements vscode.Disposable {
   private readonly log = vscode.window.createOutputChannel("OMAR Runtime");
+  private readonly warned = new vscode.EventEmitter<string>();
+  /** Lines the daemon printed about its assistant, which the chat view acts on. */
+  readonly onDidWarn = this.warned.event;
+  /**
+   * The last such line from the daemon now running. It is printed while the
+   * daemon starts, before anything has connected to it, so it is kept for
+   * whoever asks later rather than only announced.
+   */
+  assistantWarning: string | null = null;
   private handle: ServeHandle | null = null;
   private startedFor: string | null = null;
 
@@ -30,22 +39,27 @@ export class RuntimeLauncher implements vscode.Disposable {
    * Start a daemon for `url` and wait for it to answer. False when it is not
    * ours to start (not loopback, or turned off), or when it did not come up.
    */
-  async start(url: string, reason: string): Promise<boolean> {
+  async start(url: string, reason: string, options: { withAssistant?: boolean } = {}): Promise<boolean> {
     const config = vscode.workspace.getConfiguration("omar");
     if (!config.get<boolean>("autoStartRuntime", true)) return false;
-    const spec = serveSpec(
-      url,
-      config.get<string>("cliPath", "omar"),
-      config.get<string[]>("serveArguments", ["--no-ea"]),
-      config.get<string>("compilerPath", "omarc"),
-    );
+    let args = config.get<string[]>("serveArguments", ["--restart-ea"]);
+    // Asked for an assistant: whatever the arguments say, do not leave it out.
+    if (options.withAssistant) args = args.filter((argument) => argument !== "--no-ea");
+    const spec = serveSpec(url, config.get<string>("cliPath", "omar"), args, config.get<string>("compilerPath", "omarc"));
     if (!spec.address) return false;
     if (this.running) return false;
 
     this.log.appendLine(`[${new Date().toISOString()}] starting the runtime: ${reason}`);
+    this.assistantWarning = null;
     let handle: ServeHandle;
     try {
-      handle = startServe(spec, (line) => this.log.appendLine(line));
+      handle = startServe(spec, (line) => {
+        this.log.appendLine(line);
+        if (/executive assistant/i.test(line)) {
+          if (/cannot reply or propose designs/.test(line)) this.assistantWarning = line;
+          this.warned.fire(line);
+        }
+      });
     } catch (cause) {
       this.log.appendLine(`could not start: ${cause instanceof Error ? cause.message : String(cause)}`);
       return false;
@@ -89,6 +103,7 @@ export class RuntimeLauncher implements vscode.Disposable {
 
   dispose(): void {
     this.stop();
+    this.warned.dispose();
     this.log.dispose();
   }
 }

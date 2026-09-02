@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 
+import type { DiagramSnapshot } from "../client/protocol";
 import { inspect, type Row } from "../model/inspect";
 import type { Guarantee } from "../model/guarantees";
 import type { RuntimeSession } from "../runtime/RuntimeSession";
@@ -14,6 +15,7 @@ export class Selection implements vscode.Disposable {
   readonly onDidChange = this.changed.event;
   private id: string | null = null;
   private bright: string[] = [];
+  private proposed: { sequence: number; team: string; snapshot: DiagramSnapshot } | null = null;
 
   get current(): string | null {
     return this.id;
@@ -31,6 +33,16 @@ export class Selection implements vscode.Disposable {
 
   setHighlight(ids: string[]): void {
     this.bright = ids;
+    this.changed.fire();
+  }
+
+  /** A proposal being looked at in the diagram panel instead of the run. */
+  get proposal(): { sequence: number; team: string; snapshot: DiagramSnapshot } | null {
+    return this.proposed;
+  }
+
+  setProposal(proposal: { sequence: number; team: string; snapshot: DiagramSnapshot } | null): void {
+    this.proposed = proposal;
     this.changed.fire();
   }
 

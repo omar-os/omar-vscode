@@ -11,6 +11,15 @@ compilation, and a live, inspectable picture of what a deployment is doing.
 Open the OMAR activity bar with an `omar serve` daemon running and you see
 what it is running:
 
+- **Assistant** (in the panel, next to the terminal; `OMAR: Open Assistant`)
+  — the thread with the executive assistant, the same one the web Mission
+  Control talks to. Ask for a workflow and it proposes a complete
+  program the daemon has compiled; preview it in the diagram panel, open its
+  source, deploy it. Ask about the selected deployment and the message
+  carries the runtime's own account of it — each reaction's state, the port
+  values, the last events, the guarantees, where the files are — because
+  the runtime gives the assistant no other way to see a run. The component
+  you are inspecting goes along as the selection, so "this one" resolves.
 - **Deployments** — every run the daemon has started, its status and elapsed
   time. The newest is selected on its own; a run you start is selected as it
   starts.
@@ -55,6 +64,12 @@ activity bar: when nothing answers at `omar.runtimeUrl` the extension starts
 once it answers. Its output is in the **OMAR Runtime** output channel. A
 daemon that was already running is used as it is and left alone.
 
+The runtime the extension starts brings the assistant with it (on whatever
+backend `omar` is configured for: Claude Code, Codex, …), so the Assistant
+view answers at once. A runtime started by hand with `--no-ea` has none;
+the view says so, and offers to restart the runtime with one when the
+extension started it.
+
 Then open `examples/Pipeline.omar`, run **OMAR: Run Program**
 (input `first.inp` = `1`, real time), and watch the four stages go idle →
 running → completed over about eight seconds in the panel, the Teams view
@@ -94,7 +109,8 @@ only, without a daemon.
 | --- | --- | --- |
 | `omar.runtimeUrl` | `http://127.0.0.1:7340` | Where `omar serve` listens, as the extension host sees it. |
 | `omar.autoStartRuntime` | `true` | Start `omar serve` when nothing answers at a loopback address. |
-| `omar.serveArguments` | `["--no-ea"]` | Arguments for the `omar serve` the extension starts. |
+| `omar.serveArguments` | `["--restart-ea"]` | Arguments for the `omar serve` the extension starts; the assistant is started fresh so it answers through this runtime. |
+| `omar.attachDeploymentContext` | `true` | Put the runtime's account of the selected deployment in front of each message to the assistant. |
 | `omar.dataDir` | `~/.omar` | The runtime's data directory on the extension host; artifacts are read from it. |
 | `omar.cliPath` | `omar` | Used to start the runtime and to stop a deployment. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name; a path is handed to the started runtime as `OMARC_BIN`. |

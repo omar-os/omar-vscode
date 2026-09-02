@@ -55,6 +55,16 @@ export class MissionControlPanel implements vscode.Disposable {
 
   /** What the panel shows, computed afresh from the session each time. */
   state(): DiagramState {
+    const proposal = this.selection.proposal;
+    if (proposal) {
+      // What the assistant proposed, as the daemon compiled it: a picture of
+      // a program, with nothing running in it.
+      return {
+        snapshot: proposal.snapshot, selection: [], highlight: null, team: proposal.team, status: "proposal",
+        connection: "proposal", detail: "Proposed by the assistant; nothing is running. Deploy it from the Assistant view.",
+        tag: "", lag: "", empty: null,
+      };
+    }
     const run = this.session.selectedRun;
     const { live } = this.session.current;
     if (!run) {

@@ -45,7 +45,8 @@ const LOG_LIMIT = 2000;
 export type RunSource = {
   record(signal: AbortSignal): Promise<RunRecord>;
   snapshot(signal: AbortSignal): Promise<DiagramSnapshot>;
-  events(signal: AbortSignal): AsyncIterable<DiagramEvent>;
+  /** `onOpen` is called once the stream is open, before any event. */
+  events(signal: AbortSignal, onOpen?: () => void): AsyncIterable<DiagramEvent>;
 };
 
 export type FollowOptions = {
@@ -102,7 +103,7 @@ export async function followRun(
       const snapshot = await source.snapshot(signal);
       emit({ snapshot, sequence: snapshot.sequence, connection: "connecting", detail: null });
       failures = 0;
-      for await (const event of source.events(signal)) {
+      for await (const event of source.events(signal, () => emit({ connection: "live", detail: null }))) {
         if (event.sequence <= state.sequence) continue;
         if (event.sequence > state.sequence + 1) {
           // A gap. The snapshot is authoritative and carries its own sequence,

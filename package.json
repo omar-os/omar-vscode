@@ -142,6 +142,28 @@
         "command": "omar.showRuntimeLog",
         "title": "OMAR: Show Runtime Log",
         "icon": "$(output)"
+      },
+      {
+        "command": "omar.previewProposal",
+        "title": "OMAR: Preview Proposal"
+      },
+      {
+        "command": "omar.clearProposalPreview",
+        "title": "OMAR: Back to the Deployment Picture",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "omar.openProposalProgram",
+        "title": "OMAR: Open Proposed Program"
+      },
+      {
+        "command": "omar.deployProposal",
+        "title": "OMAR: Deploy Proposal"
+      },
+      {
+        "command": "omar.openAssistant",
+        "title": "OMAR: Open Assistant",
+        "icon": "$(comment-discussion)"
       }
     ],
     "menus": {
@@ -158,6 +180,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "omar.openAssistant",
+          "when": "view == omar.deployments",
+          "group": "navigation@0"
+        },
         {
           "command": "omar.openMissionControl",
           "when": "view == omar.deployments",
@@ -223,6 +250,18 @@
         {
           "command": "omar.runProgram",
           "when": "omar.canRun"
+        },
+        {
+          "command": "omar.previewProposal",
+          "when": "false"
+        },
+        {
+          "command": "omar.openProposalProgram",
+          "when": "false"
+        },
+        {
+          "command": "omar.deployProposal",
+          "when": "false"
         }
       ],
       "view/item/context": [
@@ -257,9 +296,14 @@
             "type": "string"
           },
           "default": [
-            "--no-ea"
+            "--restart-ea"
           ],
-          "description": "Extra arguments for the `omar serve` the extension starts. `--no-ea` leaves the executive assistant, which Mission Control here has no chat for, unstarted."
+          "description": "Extra arguments for the `omar serve` the extension starts. `--restart-ea` starts the executive assistant fresh so it can answer through this runtime (an assistant from an earlier runtime cannot); `--no-ea` leaves it out."
+        },
+        "omar.attachDeploymentContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prefix each message to the assistant with what the runtime says about the selected deployment: statuses, port values, recent events, guarantees, and where its files are. The assistant has no other way to see a run."
         },
         "omar.dataDir": {
           "type": "string",
@@ -293,6 +337,13 @@
         {
           "id": "omar",
           "title": "OMAR",
+          "icon": "media/omar.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "omar-assistant",
+          "title": "OMAR Assistant",
           "icon": "media/omar.svg"
         }
       ]
@@ -333,6 +384,14 @@
         {
           "id": "omar.events",
           "name": "Events",
+          "icon": "media/omar.svg"
+        }
+      ],
+      "omar-assistant": [
+        {
+          "type": "webview",
+          "id": "omar.chat",
+          "name": "Assistant",
           "icon": "media/omar.svg"
         }
       ]
@@ -417,6 +476,8 @@
     "eslint": "^9.9.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.66.0"
   }

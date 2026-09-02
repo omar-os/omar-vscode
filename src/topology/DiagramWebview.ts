@@ -21,7 +21,7 @@ export type DiagramState = {
   highlight: string[] | null;
   team: string;
   status: string;
-  connection: "connecting" | "live" | "stale" | "final" | "compiled" | null;
+  connection: "connecting" | "live" | "stale" | "final" | "compiled" | "proposal" | null;
   detail: string | null;
   tag: string;
   lag: string;

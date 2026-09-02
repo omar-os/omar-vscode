@@ -4,7 +4,8 @@ import * as vscode from "vscode";
 
 import { RuntimeRefused, ServeClient } from "../client/OmarClient";
 import type { DiagramSnapshot } from "../client/protocol";
-import { parseInputValue } from "../model/inputs";
+import { openInputs, parseInputValue } from "../model/inputs";
+import type { ProposedDesign } from "../client/chat";
 import type { RuntimeSession } from "../runtime/RuntimeSession";
 
 /**
@@ -64,9 +65,43 @@ export async function runProgram(session: RuntimeSession, document?: vscode.Text
   }
 }
 
+/**
+ * Deploy what the assistant proposed: its program and the inputs it named,
+ * asking the operator for any open input it left out, through the daemon's
+ * own admission route. The proposal was compiled by the daemon already, so
+ * the only refusal left is the run's.
+ */
+export async function deployProposal(session: RuntimeSession, design: ProposedDesign): Promise<boolean> {
+  const url = session.current.url;
+  if (session.current.reach !== "connected" || !url) {
+    vscode.window.showWarningMessage("Not connected to an OMAR runtime.");
+    return false;
+  }
+  const missing = openInputs(design.preview).filter((port) => !(port.name in design.inputs)).map((port) => port.name);
+  const asked = await askInputs(missing, design.preview, design.inputs);
+  if (asked === undefined) return false;
+  const pace = await vscode.window.showQuickPick(
+    [
+      { label: "$(watch) Real time", description: "Delays are waits, as the program says.", fast: false },
+      { label: "$(zap) As fast as the work allows", description: "Delays stay an ordering and stop being a wait.", fast: true },
+    ],
+    { title: `Deploy ${design.preview.team}` },
+  );
+  if (!pace) return false;
+  try {
+    const record = await new ServeClient(url).startRun({ program: design.program, inputs: asked, fast: pace.fast });
+    session.adopt(record);
+    vscode.window.setStatusBarMessage(`OMAR: started ${record.team} (${record.run_id.slice(0, 8)})`, 5000);
+    return true;
+  } catch (cause) {
+    vscode.window.showErrorMessage(`The runtime refused to start the run: ${describe(cause)}`);
+    return false;
+  }
+}
+
 /** One prompt per open input, typed by the port; cancelling any cancels the run. */
-async function askInputs(openInputs: string[], preview: DiagramSnapshot): Promise<Record<string, unknown> | undefined> {
-  const inputs: Record<string, unknown> = {};
+async function askInputs(openInputs: string[], preview: DiagramSnapshot, given: Record<string, unknown> = {}): Promise<Record<string, unknown> | undefined> {
+  const inputs: Record<string, unknown> = { ...given };
   for (const name of openInputs) {
     const type = preview.ports.find((port) => port.name === name)?.type ?? "string";
     const text = await vscode.window.showInputBox({

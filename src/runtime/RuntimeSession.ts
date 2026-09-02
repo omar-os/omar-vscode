@@ -246,9 +246,9 @@ export class RuntimeSession implements vscode.Disposable {
         if (!diagramUrl) return Promise.reject(new Error("The run has no diagram address."));
         return new DiagramClient(diagramUrl).snapshot(signal);
       },
-      events: (signal: AbortSignal) => {
+      events: (signal: AbortSignal, onOpen?: () => void) => {
         if (!diagramUrl) throw new Error("The run has no diagram address.");
-        return new DiagramClient(diagramUrl).events(signal);
+        return new DiagramClient(diagramUrl).events(signal, onOpen);
       },
     };
     void followRun(
