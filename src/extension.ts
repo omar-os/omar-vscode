@@ -8,11 +8,13 @@ import { DeploymentsProvider } from "./views/DeploymentsProvider";
 import { SummaryProvider } from "./views/SummaryProvider";
 import { TeamsProvider } from "./views/TeamsProvider";
 import { StatusBar } from "./views/StatusBar";
+import { InspectorProvider, Selection } from "./views/Inspector";
+import { MissionControlPanel } from "./topology/MissionControlPanel";
 
 const LANGUAGE = "omar";
 
 /** What the extension hands back, so a test can watch the session it runs. */
-export type OmarApi = { session: RuntimeSession };
+export type OmarApi = { session: RuntimeSession; selection: Selection; panel: MissionControlPanel };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE);
@@ -63,7 +65,7 @@ export function activate(context: vscode.ExtensionContext): OmarApi {
     vscode.workspace.onDidCloseTextDocument((document) => diagnostics.delete(document.uri)),
   );
 
-  return { session: activateMissionControl(context) };
+  return activateMissionControl(context);
 }
 
 export function deactivate(): void {}
@@ -74,16 +76,24 @@ export function deactivate(): void {}
  * The views are thin. Each asks the session for what it holds and redraws
  * when told; none keeps state of its own, so none can disagree with another.
  */
-function activateMissionControl(context: vscode.ExtensionContext): RuntimeSession {
+function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const session = new RuntimeSession();
   const deployments = new DeploymentsProvider(session);
   const summary = new SummaryProvider(session);
   const teams = new TeamsProvider(session);
+  const selection = new Selection();
+  const inspector = new InspectorProvider(session, selection);
+  const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
+  const panel = new MissionControlPanel(session, selection);
   context.subscriptions.push(
     session,
     deployments,
     summary,
     teams,
+    selection,
+    inspector,
+    inspectorView,
+    panel,
     new StatusBar(session),
     vscode.window.registerTreeDataProvider("omar.deployments", deployments),
     vscode.window.registerTreeDataProvider("omar.summary", summary),
@@ -91,7 +101,14 @@ function activateMissionControl(context: vscode.ExtensionContext): RuntimeSessio
     session.onDidChange((state) => {
       void vscode.commands.executeCommand("setContext", "omar.reach", state.reach);
       void vscode.commands.executeCommand("setContext", "omar.hasSelection", state.selected !== null);
+      // A new run is a new picture; what was selected in the old one is gone.
+      if (selection.current && !state.live?.snapshot) selection.set(null);
     }),
+    selection.onDidChange(() => {
+      inspectorView.description = inspector.title() ?? undefined;
+      void vscode.commands.executeCommand("setContext", "omar.inspecting", selection.current !== null);
+    }),
+    vscode.commands.registerCommand("omar.openMissionControl", () => panel.show()),
 
     vscode.commands.registerCommand("omar.connect", async (url?: string) => {
       const configured = configuredUrl();
@@ -141,16 +158,14 @@ function activateMissionControl(context: vscode.ExtensionContext): RuntimeSessio
       );
       if (pick) session.select(pick.runId);
     }),
-    vscode.commands.registerCommand("omar.inspect", (id: string) => {
-      // Until the inspector exists, the tree's own tooltip is the detail.
-      void vscode.commands.executeCommand("setContext", "omar.inspected", id);
-    }),
+    vscode.commands.registerCommand("omar.inspect", (id: string | null) => selection.set(id ?? null)),
     vscode.commands.registerCommand("omar.showMenu", async () => {
       const state = session.current;
       const choices = [
         state.reach === "disconnected"
           ? { label: "$(plug) Connect to runtime", command: "omar.connect" }
           : { label: "$(debug-disconnect) Disconnect", command: "omar.disconnect" },
+        { label: "$(type-hierarchy) Open Mission Control", command: "omar.openMissionControl" },
         { label: "$(list-selection) Select deployment", command: "omar.selectDeployment" },
         { label: "$(refresh) Refresh", command: "omar.refresh" },
       ];
@@ -170,7 +185,7 @@ function activateMissionControl(context: vscode.ExtensionContext): RuntimeSessio
   // Connect on activation: the address has a default, and an unreachable
   // daemon is shown as exactly that rather than as a prompt.
   void session.connect(configuredUrl());
-  return session;
+  return { session, selection, panel };
 }
 
 function configuredUrl(): string {

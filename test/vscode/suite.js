@@ -18,7 +18,7 @@ async function run() {
   const extension = vscode.extensions.getExtension("omar-os.omar-vscode");
   assert.ok(extension, "the extension is installed in the test host");
   const api = await extension.activate();
-  const { session } = api;
+  const { session, selection, panel } = api;
 
   const commands = await vscode.commands.getCommands(true);
   for (const command of ["omar.connect", "omar.disconnect", "omar.selectDeployment", "omar.refresh", "omar.compile", "omar.showDiagram"]) {
@@ -44,6 +44,16 @@ async function run() {
     const watch = snapshot.reactions.find((reaction) => reaction.id === "reaction::watch.reaction.0");
     assert.equal(watch.status, "running", "the streamed event reached the picture");
     assert.equal(session.current.live.sequence, 11);
+
+    // The topology panel draws the same picture, and a click in it inspects.
+    await vscode.commands.executeCommand("omar.openMissionControl");
+    const drawn = panel.state();
+    assert.equal(drawn.connection, "live");
+    assert.ok(drawn.graph.nodes.some((node) => node.id === "reaction::watch.reaction.0" && node.status === "running"));
+    assert.equal(drawn.graph.boxes.length, 4, "one box per instance");
+    await vscode.commands.executeCommand("omar.inspect", "reaction::watch.reaction.0");
+    assert.equal(selection.current, "reaction::watch.reaction.0");
+    assert.equal(panel.state().selected, "reaction::watch.reaction.0");
 
     await vscode.commands.executeCommand("omar.disconnect");
     assert.equal(session.current.reach, "disconnected");

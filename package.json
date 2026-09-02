@@ -78,6 +78,11 @@
       {
         "command": "omar.showMenu",
         "title": "OMAR: Mission Control Menu"
+      },
+      {
+        "command": "omar.openMissionControl",
+        "title": "OMAR: Open Mission Control",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "menus": {
@@ -89,6 +94,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "omar.openMissionControl",
+          "when": "view == omar.deployments",
+          "group": "navigation@0"
+        },
         {
           "command": "omar.refresh",
           "when": "view == omar.deployments && omar.reach != 'disconnected'",
@@ -167,6 +177,11 @@
           "id": "omar.teams",
           "name": "Teams",
           "icon": "media/omar.svg"
+        },
+        {
+          "id": "omar.inspector",
+          "name": "Inspector",
+          "icon": "media/omar.svg"
         }
       ]
     },
@@ -200,6 +215,11 @@
         "view": "omar.teams",
         "contents": "No deployment selected.",
         "when": "!omar.hasSelection"
+      },
+      {
+        "view": "omar.inspector",
+        "contents": "Click an agent, reaction, port or team in the topology or the Teams view to inspect it.",
+        "when": "!omar.inspecting"
       }
     ]
   },
