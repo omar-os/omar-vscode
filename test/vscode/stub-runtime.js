@@ -21,6 +21,20 @@ function start() {
     error: null,
   };
   const started = [];
+  // The chat: the thread in memory, replayed to every subscriber, and an
+  // assistant that answers at once — with a proposal when asked to propose.
+  const chat = [];
+  const subscribers = new Set();
+  let sequence = 0;
+  const publish = (message) => {
+    const entry = { sequence: ++sequence, progress: false, design: null, selection: [], ...message };
+    chat.push(entry);
+    for (const stream of subscribers) writeChat(stream, entry);
+    return entry;
+  };
+  const writeChat = (stream, entry) => {
+    stream.write(`id: ${entry.sequence}\nevent: ${entry.design ? "design_proposed" : "message"}\ndata: ${JSON.stringify(entry)}\n\n`);
+  };
   const server = createServer((request, response) => {
     const json = (status, body) => {
       response.writeHead(status, { "content-type": "application/json", connection: "close" });
@@ -39,6 +53,24 @@ function start() {
           started.push(parsed);
           return json(201, { ...record, run_id: "run-2", started_at: record.started_at + 1 });
         }
+        if (request.url === "/v1/chat") {
+          if (!parsed.text || !parsed.text.trim()) return json(400, { error: "empty message" });
+          const operator = publish({ role: "operator", text: parsed.text, selection: parsed.selection ?? [] });
+          setTimeout(() => {
+            publish({ role: "assistant", text: "Looking at it.", progress: true });
+            if (/propose/i.test(parsed.text)) {
+              publish({
+                role: "assistant",
+                text: "Here is a program that does that.",
+                design: { program: "team T {}", inputs: { "src.go": 1 }, preview: JSON.parse(SNAPSHOT) },
+              });
+            } else {
+              publish({ role: "assistant", text: `You said: ${parsed.text.split("\n").pop()}` });
+            }
+          }, 50);
+          return json(202, operator);
+        }
+        if (request.url === "/v1/agent/backend") return json(200, { backend: parsed.backend, session: "ea-0" });
         json(404, { error: "not found" });
       });
       return;
@@ -50,6 +82,18 @@ function start() {
         return json(200, { runs: [record, ...started.map((_, index) => ({ ...record, run_id: `run-${index + 2}`, started_at: record.started_at + 1 }))] });
       case "/v1/runs/run-1":
         return json(200, record);
+      case "/v1/chat":
+        return json(200, { messages: chat });
+      case "/v1/agent":
+        return json(200, { backend: "claude", available: ["claude", "codex"] });
+      case "/v1/chat/events": {
+        response.writeHead(200, { "content-type": "text/event-stream" });
+        response.write(": connected\n\n");
+        for (const entry of chat) writeChat(response, entry);
+        subscribers.add(response);
+        request.on("close", () => subscribers.delete(response));
+        return;
+      }
       case "/v1/runs/run-2":
         return json(200, { ...record, run_id: "run-2", started_at: record.started_at + 1 });
       case "/v1/diagram":
@@ -72,7 +116,7 @@ function start() {
     server.listen(0, "127.0.0.1", () => {
       const url = `http://127.0.0.1:${server.address().port}`;
       record.diagram_address = `127.0.0.1:${server.address().port}`;
-      resolve({ url, started, close: () => server.close() });
+      resolve({ url, started, chat, close: () => { for (const stream of subscribers) stream.end(); server.close(); } });
     });
   });
 }

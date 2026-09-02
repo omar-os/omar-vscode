@@ -1,3 +1,5 @@
+import type { DiagramSnapshot } from "../client/protocol";
+
 /**
  * What an operator typed, as a value of the port's type.
  *
@@ -36,4 +38,13 @@ export function parseInputValue(type: string, text: string): unknown | undefined
         return undefined;
       }
   }
+}
+
+/**
+ * Inputs nothing inside the program writes to: the ones the operator supplies.
+ * Read off the picture the same way the daemon's own diagnostic does.
+ */
+export function openInputs(snapshot: DiagramSnapshot): { name: string; type: string }[] {
+  const fed = new Set(snapshot.edges.filter((edge) => edge.kind === "connection").map((edge) => edge.target));
+  return snapshot.ports.filter((port) => port.kind === "input" && !fed.has(port.id)).map((port) => ({ name: port.name, type: port.type }));
 }

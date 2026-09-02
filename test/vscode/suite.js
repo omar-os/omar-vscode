@@ -21,7 +21,7 @@ async function run() {
   const extension = vscode.extensions.getExtension("omar-os.omar-vscode");
   assert.ok(extension, "the extension is installed in the test host");
   const api = await extension.activate();
-  const { session, launcher, selection, panel, artifacts, guarantees } = api;
+  const { session, launcher, selection, panel, artifacts, guarantees, chat } = api;
 
   // A data directory shaped like the runtime's, so the artifacts view has
   // something real to list and open.
@@ -100,6 +100,45 @@ async function run() {
     await vscode.commands.executeCommand(item.command.command, ...item.command.arguments);
     await until(() => vscode.window.activeTextEditor?.document.uri.fsPath === log.path, "the log to open in an editor");
     assert.match(vscode.window.activeTextEditor.document.getText(), /hello from the watcher/);
+
+    // The assistant: the thread is followed once the daemon is reached, a
+    // message carries the runtime's account of the selected deployment and
+    // the inspected component, and a proposal can be previewed and deployed.
+    await until(() => chat.state.connection === "live", "the chat thread to go live");
+    await vscode.commands.executeCommand("omar.inspect", "port::src.go");
+    assert.equal(await chat.send("please propose something"), true);
+    await until(() => chat.messages.some((message) => message.design), "the assistant to propose", 15_000);
+    const sent = chat.messages.find((message) => message.role === "operator");
+    assert.match(sent.text, /^\[Mission Control context/, "the runtime's account goes in front");
+    assert.match(sent.text, /Deployment program \(run run-1\): RUNNING/);
+    assert.match(sent.text, /watch\.reaction\.0 — running/);
+    assert.match(sent.text, /please propose something$/);
+    assert.deepEqual(sent.selection, ["src.go"], "the inspected component is the selection");
+    assert.equal(chat.state.drafting, false, "a proposal ends the wait");
+    const proposal = chat.messages.find((message) => message.design);
+    await vscode.commands.executeCommand("omar.previewProposal", proposal.sequence);
+    assert.equal(panel.state().connection, "proposal");
+    assert.equal(panel.state().team, "program");
+    await vscode.commands.executeCommand("omar.clearProposalPreview");
+    assert.equal(panel.state().connection, "live");
+    {
+      const originalPick = vscode.window.showQuickPick;
+      vscode.window.showQuickPick = async (items) => items[1];
+      try {
+        await vscode.commands.executeCommand("omar.deployProposal", proposal.sequence);
+      } finally {
+        vscode.window.showQuickPick = originalPick;
+      }
+    }
+    assert.equal(stub.started.length, 1, "the proposal was deployed through the daemon");
+    assert.equal(stub.started[0].program, "team T {}");
+    assert.deepEqual(stub.started[0].inputs, { "src.go": 1 }, "the assistant's inputs, with nothing to ask");
+    assert.equal(stub.started[0].fast, true);
+    assert.equal(session.current.selected, "run-2");
+    stub.started.length = 0;
+    session.select("run-1");
+    await until(() => session.current.live?.connection === "live", "run-1 to be live again");
+    await vscode.commands.executeCommand("omar.inspect", null);
 
     // Capabilities are found out, not assumed: the daemon answers, so a run
     // can be started; the CLI is not asked for here, so stopping is not offered.

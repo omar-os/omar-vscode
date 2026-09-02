@@ -22,7 +22,7 @@ type State = {
   highlight: string[] | null;
   team: string;
   status: string;
-  /** live, stale, final, connecting, compiled — or null when nothing is shown. */
+  /** live, stale, final, connecting, compiled, proposal — or null when nothing is shown. */
   connection: string | null;
   detail: string | null;
   tag: string;

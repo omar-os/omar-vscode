@@ -17,7 +17,8 @@ import { StatusBar } from "./views/StatusBar";
 import { InspectorProvider, Selection } from "./views/Inspector";
 import { MissionControlPanel } from "./topology/MissionControlPanel";
 import type { Guarantee } from "./model/guarantees";
-import { runProgram, stopDeployment } from "./commands/operate";
+import { deployProposal, runProgram, stopDeployment } from "./commands/operate";
+import { ChatView } from "./chat/ChatView";
 import { dataDir, workspaceFiles } from "./artifacts/files";
 import { ArtifactsProvider } from "./views/ArtifactsProvider";
 import { GuaranteesProvider } from "./views/GuaranteesProvider";
@@ -33,6 +34,7 @@ export type OmarApi = {
   panel: MissionControlPanel;
   artifacts: ArtifactsProvider;
   guarantees: GuaranteesProvider;
+  chat: ChatView;
 };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
@@ -113,6 +115,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const inspector = new InspectorProvider(session, selection, guarantees);
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
   const panel = new MissionControlPanel(context.extensionUri, session, selection);
+  const chat = new ChatView(context.extensionUri, session, selection, guarantees, artifacts, launcher);
   context.subscriptions.push(
     launcher,
     vscode.commands.registerCommand("omar.startRuntime", async () => {
@@ -132,6 +135,31 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
       void session.refresh();
     }),
     vscode.commands.registerCommand("omar.showRuntimeLog", () => launcher.showLog()),
+    chat,
+    vscode.window.registerWebviewViewProvider(ChatView.viewType, chat, { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.commands.registerCommand("omar.openAssistant", () => vscode.commands.executeCommand("omar.chat.focus")),
+    vscode.commands.registerCommand("omar.previewProposal", (sequence: number) => {
+      const message = chat.proposalAt(sequence);
+      if (!message?.design) return;
+      if (selection.proposal?.sequence === sequence) {
+        selection.setProposal(null);
+        return;
+      }
+      selection.setProposal({ sequence, team: message.design.preview.team, snapshot: message.design.preview });
+      panel.show();
+    }),
+    vscode.commands.registerCommand("omar.clearProposalPreview", () => selection.setProposal(null)),
+    vscode.commands.registerCommand("omar.openProposalProgram", async (sequence: number) => {
+      const message = chat.proposalAt(sequence);
+      if (!message?.design) return;
+      const document = await vscode.workspace.openTextDocument({ language: "omar", content: message.design.program });
+      await vscode.window.showTextDocument(document, { preview: false });
+    }),
+    vscode.commands.registerCommand("omar.deployProposal", async (sequence: number) => {
+      const message = chat.proposalAt(sequence);
+      if (!message?.design) return;
+      if (await deployProposal(session, message.design)) selection.setProposal(null);
+    }),
     artifacts,
     guarantees,
     events,
@@ -283,7 +311,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   // Connect on activation: the address has a default, and when nothing
   // answers there the session starts a runtime rather than asking.
   void session.connect(configuredUrl());
-  return { session, launcher, selection, panel, artifacts, guarantees };
+  return { session, launcher, selection, panel, artifacts, guarantees, chat };
 }
 
 function sameAddress(a: string, b: string | null): boolean {
