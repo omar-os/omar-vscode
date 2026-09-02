@@ -1,7 +1,7 @@
 {
   "name": "omar-vscode",
   "displayName": "OMAR",
-  "description": "Syntax highlighting, compilation, and a live topology diagram for the OMAR language.",
+  "description": "OMAR language support and Mission Control: syntax highlighting, compilation, and live observation of running deployments.",
   "version": "0.1.0",
   "license": "BSD-3-Clause",
   "publisher": "omar-os",
@@ -64,6 +64,11 @@
     "configuration": {
       "title": "OMAR",
       "properties": {
+        "omar.runtimeUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:7340",
+          "description": "Address of `omar serve`, the daemon Mission Control reads deployments from."
+        },
         "omar.compilerPath": {
           "type": "string",
           "default": "omarc",
