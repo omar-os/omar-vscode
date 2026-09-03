@@ -156,9 +156,11 @@ preview}`; the daemon compiled the program before relaying it.
 `Thread` (no vscode import) places each message by sequence so a replay
 changes nothing, holds `drafting` from the operator's message until an
 assistant message that is not `progress`, and reconnects a broken stream.
-`ChatView` mounts the web app's `ChatMessage` component (react-markdown, so
-model output is never injected as HTML) in a webview view in its own panel
-container, so the thread has the room a conversation needs; the composer,
+`ChatView` draws the thread the way VS Code draws its own chat — on the
+editor's theme variables, a name above each turn, requests in a box,
+responses as markdown through react-markdown (so model output is never
+injected as HTML) — in a webview view in its own panel container, so the
+thread has the room a conversation needs; the composer,
 selection bar and proposal buttons are the studio's chrome, kept to what the
 extension has a use for.
 
@@ -184,6 +186,13 @@ selects the run. The operator deploys; the assistant never does.
 (`POST /v1/agent/backend`). Terminal opens `tmux attach-session -t
 <prefix>ea-<ea>` in a VS Code terminal, on the extension host, which under
 Remote SSH is where the assistant is.
+
+**A delivery that did not take.** The daemon pastes a message into the
+assistant's pane and checks that it took; an assistant still starting up
+does not take it, and the daemon answers "prompt delivery … was not
+verified". `Thread.send` retries such a send eight times, eight seconds
+apart, saying it is waiting, before showing the daemon's words; the view
+then offers the assistant's terminal.
 
 **No assistant.** A daemon started with `--no-ea` refuses chat with "the
 executive assistant is not running"; the view shows that and, when the

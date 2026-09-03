@@ -16,6 +16,7 @@ function stubChat() {
   const streams = new Set();
   let sequence = 0;
   let refuse = null;
+  let refuseWhile = null;
   const write = (stream, entry) =>
     stream.write(`id: ${entry.sequence}\nevent: ${entry.design ? "design_proposed" : "message"}\ndata: ${JSON.stringify(entry)}\n\n`);
   const publish = (message) => {
@@ -44,6 +45,8 @@ function stubChat() {
       request.on("data", (chunk) => (body += chunk));
       request.on("end", () => {
         if (refuse) return json(502, { error: refuse });
+        const refusal = refuseWhile?.();
+        if (refusal) return json(502, { error: refusal });
         const { text, selection } = JSON.parse(body);
         json(202, publish({ role: "operator", text, selection }));
       });
@@ -57,6 +60,9 @@ function stubChat() {
     messages,
     set refuse(value) {
       refuse = value;
+    },
+    set refuseWhile(value) {
+      refuseWhile = value;
     },
     dropStreams() {
       for (const stream of streams) stream.destroy();
@@ -114,6 +120,29 @@ describe("the thread with the assistant", () => {
     assert.deepEqual(thread.current.messages.map((message) => message.sequence), [1, 2, 3, 4]);
     thread.stop();
     assert.equal(thread.current.connection, "off");
+  });
+
+  test("a delivery the daemon could not verify is tried again while the assistant starts", async () => {
+    let refusals = 0;
+    daemon.refuseWhile = () => refusals++ < 2 && "prompt delivery to 'omar-agent-ea-0' was not verified after 3 attempt(s)";
+    const states = [];
+    const thread = new Thread(new ChatClient(url), (state) => states.push(state), 10);
+    thread.deliveryWaitMs = 5;
+    assert.equal(await thread.send("hello?", []), true);
+    assert.equal(refusals, 3, "asked until it took");
+    assert.ok(states.some((state) => /not accepted the message yet \(try 1 of 8\)/.test(state.problem ?? "")), "said it was waiting");
+    assert.equal(thread.current.problem, null);
+    daemon.refuseWhile = null;
+  });
+
+  test("a delivery that never takes ends in the daemon's words", async () => {
+    daemon.refuseWhile = () => "prompt delivery to 'omar-agent-ea-0' was not verified after 3 attempt(s)";
+    const thread = new Thread(new ChatClient(url), () => {}, 10);
+    thread.deliveryTries = 2;
+    thread.deliveryWaitMs = 5;
+    assert.equal(await thread.send("hello?", []), false);
+    assert.match(thread.current.problem, /not verified/);
+    daemon.refuseWhile = null;
   });
 
   test("a refusal is kept in the daemon's words", async () => {

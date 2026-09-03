@@ -1,9 +1,10 @@
-// Bundle the webviews: the web app's DiagramCanvas and ChatMessage, from the
-// vendored omar checkout, with React (and ELK, react-markdown) into one
-// script each under media/webview/, plus stylesheets cut from the web app's
-// globals.css between markers — the rest of that file styles the studio
-// around them and pulls in Tailwind, which a webview has no use for. A moved
-// marker fails the build loudly rather than shipping unstyled.
+// Bundle the webviews: the web app's DiagramCanvas, from the vendored omar
+// checkout, with React and ELK; and the chat, with React and react-markdown,
+// into one script each under media/webview/. The diagram's stylesheet is cut
+// from the web app's globals.css between markers — the rest of that file
+// styles the studio around it and pulls in Tailwind, which a webview has no
+// use for; a moved marker fails the build loudly rather than shipping
+// unstyled. The chat is drawn on VS Code's own theme and needs none of it.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,16 +28,6 @@ const variables = cut(css, ":root {", "}", "the :root variables") + "}\n* { box-
 
 const diagram = cut(css, "/* --- Lingua-Franca-inspired diagram grammar", ".inspector-panel {", "the diagram section");
 writeFileSync(resolve(out, "diagram.css"), `${header}${variables}${diagram}`);
-
-// The chat: the thread and its messages, the composer, the recessive
-// progress notes, the selection bar, and the selection line on a message.
-const chat = [
-  cut(css, ".messages {", ".diagram-panel {", "the thread section"),
-  cut(css, "/* Deploy sits with send", "/* With the window to itself", "the composer actions"),
-  cut(css, "/* Commentary while the assistant works", "/* The team panel is a backdrop", "the progress and selection section"),
-  cut(css, ".message-selection {", "/* A terminal attached", "the message selection rule"),
-].join("\n");
-writeFileSync(resolve(out, "chat.css"), `${header}${variables}${chat}`);
 
 for (const [entry, outfile] of [
   ["webview/main.tsx", "media/webview/diagram.js"],
