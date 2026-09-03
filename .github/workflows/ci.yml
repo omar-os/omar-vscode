@@ -31,6 +31,13 @@ jobs:
       # A real VS Code, headless, with the extension loaded and a stub runtime
       # to talk to: activation, the commands, and a picture going live.
       - run: xvfb-run -a node test/vscode/run.mjs
+      # The installable package, kept with the run so a build of main can be
+      # installed without a checkout.
+      - run: npx vsce package --no-dependencies
+      - uses: actions/upload-artifact@v4
+        with:
+          name: omar-vscode-vsix
+          path: "*.vsix"
 
   # The compiler is a Lean build, so the tests that use it run apart from the
   # ones that do not. Without this the parsing of its errors is only ever
