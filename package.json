@@ -346,7 +346,7 @@
     "viewsWelcome": [
       {
         "view": "omar.summary",
-        "contents": "Not connected to an OMAR runtime.\\n[Connect](command:omar.connect)",
+        "contents": "Not connected to an OMAR runtime.\n[Connect](command:omar.connect)",
         "when": "omar.reach == 'disconnected'"
       },
       {
@@ -356,17 +356,17 @@
       },
       {
         "view": "omar.summary",
-        "contents": "Starting the runtime\u2026\\n[Show runtime log](command:omar.showRuntimeLog)",
+        "contents": "Starting the runtime\u2026\n[Show runtime log](command:omar.showRuntimeLog)",
         "when": "omar.reach == 'starting'"
       },
       {
         "view": "omar.summary",
-        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\\n[Start runtime](command:omar.startRuntime)\\n[Show runtime log](command:omar.showRuntimeLog)\\n[Change address](command:omar.connect)",
+        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\n[Start runtime](command:omar.startRuntime)\n[Show runtime log](command:omar.showRuntimeLog)\n[Change address](command:omar.connect)",
         "when": "omar.reach == 'unreachable'"
       },
       {
         "view": "omar.summary",
-        "contents": "Connected. The runtime has no deployments yet; run an .omar program, or ask the assistant for one.\\n[Open Assistant](command:omar.openAssistant)",
+        "contents": "Connected. The runtime has no deployments yet; run an .omar program, or ask the assistant for one.\n[Open Assistant](command:omar.openAssistant)",
         "when": "omar.reach == 'connected' && !omar.hasSelection"
       }
     ]

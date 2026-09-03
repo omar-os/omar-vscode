@@ -1,22 +1,31 @@
 import { StrictMode, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { createRoot } from "react-dom/client";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Boundary } from "./boundary";
 
-import { ChatMessage } from "../vendor/omar/web/app/chat-message";
-import type { ChatMessage as ChatMessageModel } from "../vendor/omar/web/app/lib/protocol";
-
 /**
- * The conversation with the assistant, in the sidebar.
- *
- * Messages are drawn by the web app's own component; what is around them —
- * the composer, the selection the next message will carry, the proposal
- * buttons, and whether the thread is live — is the studio's chrome, kept to
- * what the extension has a use for. Every network call is the extension
- * host's; the page only asks.
+ * The conversation with the assistant, in the panel, drawn the way VS Code
+ * draws its own chat: on the editor's theme, a name above each turn, the
+ * operator's turns in a request box, the assistant's as markdown, and a
+ * rounded composer at the bottom. Every colour is a VS Code theme variable,
+ * so it follows whatever theme is on. Assistant text is model output and
+ * is rendered by react-markdown, which does not inject HTML. Every network
+ * call is the extension host's; the page only asks.
  */
 
-type Shown = ChatMessageModel & { contextAttached?: boolean };
+type ProposedDesign = { program: string; inputs: Record<string, unknown>; preview: { team: string } };
+
+type Shown = {
+  sequence: number;
+  role: "operator" | "assistant";
+  text: string;
+  progress: boolean;
+  design: ProposedDesign | null;
+  selection: string[];
+  contextAttached?: boolean;
+};
 
 type State = {
   messages: Shown[];
@@ -52,6 +61,41 @@ type Outgoing =
 const vscode = acquireVsCodeApi();
 const post = (message: Outgoing) => vscode.postMessage(message);
 
+function Turn({ message, previewing }: { message: Shown; previewing: number | null }) {
+  const operator = message.role === "operator";
+  return (
+    <div className={`turn ${operator ? "request" : "response"}${message.progress ? " progress" : ""}`}>
+      <div className="who">
+        <span className={`avatar ${operator ? "you" : "ea"}`}>{operator ? "Y" : "EA"}</span>
+        <span className="name">{operator ? "You" : "Assistant"}</span>
+        {message.selection.length > 0 ? <span className="chip" title="Selected when this was sent">{message.selection.join(", ")}</span> : null}
+        {message.contextAttached ? <span className="chip muted" title="The runtime's account of the deployment went with this message">deployment context</span> : null}
+      </div>
+      {operator ? (
+        <div className="request-body">{message.text}</div>
+      ) : (
+        <div className="response-body">
+          <Markdown remarkPlugins={[remarkGfm]}>{message.text}</Markdown>
+        </div>
+      )}
+      {message.design ? (
+        <div className="actions">
+          <span className="muted">Proposal · {message.design.preview.team}</span>
+          <button type="button" className="secondary" onClick={() => post({ kind: "preview", sequence: message.sequence })}>
+            {previewing === message.sequence ? "Previewing" : "Preview"}
+          </button>
+          <button type="button" className="secondary" onClick={() => post({ kind: "openProgram", sequence: message.sequence })}>
+            Open program
+          </button>
+          <button type="button" className="primary" onClick={() => post({ kind: "deploy", sequence: message.sequence })}>
+            Deploy…
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function App() {
   // Not restored from what VS Code persisted: a page from an older build
   // would restore an older shape, and the extension posts the whole state
@@ -62,9 +106,7 @@ function App() {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<{ kind?: string; state?: State }>) => {
-      if (event.data?.kind === "state" && event.data.state) {
-        setState(event.data.state);
-      }
+      if (event.data?.kind === "state" && event.data.state) setState(event.data.state);
     };
     window.addEventListener("message", onMessage);
     post({ kind: "ready" });
@@ -94,9 +136,9 @@ function App() {
 
   return (
     <>
-      <header className="thread-head">
+      <header>
+        <span className={`dot ${state.connection}`} title={`Thread ${state.connection}`} />
         <b>Assistant</b>
-        <span className={`pill ${state.connection}`}>{state.connection.toUpperCase()}</span>
         {state.backends.length > 0 ? (
           <select
             value={state.assistant ?? ""}
@@ -113,8 +155,9 @@ function App() {
         ) : state.assistant ? (
           <span className="muted">{state.assistant}</span>
         ) : null}
+        <span className="grow" />
         {state.connection === "live" ? (
-          <button type="button" className="head-button" title="Open a terminal on the assistant's tmux pane" onClick={() => post({ kind: "action", action: "attachTerminal" })}>
+          <button type="button" className="secondary" title="Open a terminal on the assistant's tmux pane" onClick={() => post({ kind: "action", action: "attachTerminal" })}>
             Terminal
           </button>
         ) : null}
@@ -123,67 +166,65 @@ function App() {
         <div className="notice">
           <span>{state.notice.text}</span>
           {state.notice.action && state.notice.label ? (
-            <button type="button" className="primary-button" onClick={() => post({ kind: "action", action: state.notice!.action! })}>
+            <button type="button" className="primary" onClick={() => post({ kind: "action", action: state.notice!.action! })}>
               {state.notice.label}
             </button>
           ) : null}
         </div>
       ) : null}
-      <div className="messages" ref={threadRef}>
+      <div className="thread" ref={threadRef}>
         {state.messages.length === 0 && !state.drafting ? (
-          <p className="empty">Ask the assistant for a workflow, or about the selected deployment.</p>
+          <div className="empty">
+            <p>Ask the assistant for a workflow, or about the selected deployment.</p>
+            <p className="muted">A proposal can be previewed in the Topology panel and deployed from here.</p>
+          </div>
         ) : null}
         {state.messages.map((message) => (
-          <div key={message.sequence} className="turn">
-            <ChatMessage message={message} />
-            {message.contextAttached ? <p className="context-note">deployment context attached</p> : null}
-            {message.design ? (
-              <div className="proposal-actions">
-                <span className="muted">Proposal: {message.design.preview.team}</span>
-                <button type="button" className="secondary-button" onClick={() => post({ kind: "preview", sequence: message.sequence })}>
-                  {state.previewing === message.sequence ? "Previewing" : "Preview"}
-                </button>
-                <button type="button" className="secondary-button" onClick={() => post({ kind: "openProgram", sequence: message.sequence })}>
-                  Open program
-                </button>
-                <button type="button" className="primary-button" onClick={() => post({ kind: "deploy", sequence: message.sequence })}>
-                  Deploy…
-                </button>
-              </div>
-            ) : null}
-          </div>
+          <Turn key={message.sequence} message={message} previewing={state.previewing} />
         ))}
-        {state.drafting ? <p className="waiting">The assistant is working…</p> : null}
+        {state.drafting ? (
+          <div className="turn response">
+            <div className="who">
+              <span className="avatar ea">EA</span>
+              <span className="name">Assistant</span>
+            </div>
+            <div className="response-body muted">Working…</div>
+          </div>
+        ) : null}
       </div>
-      {state.selection.length > 0 ? (
-        <div className="selection-bar">
-          <span className="selection-label">{state.selection.join(", ")}</span>
-          <button type="button" className="selection-clear" onClick={() => post({ kind: "clearSelection" })}>
-            clear
-          </button>
-        </div>
-      ) : null}
-      {state.problem ? <p className="problem">{state.problem}</p> : null}
-      <form className="prompt-box" onSubmit={submit}>
+      {state.problem ? <div className="problem">{state.problem}</div> : null}
+      <form className="composer" onSubmit={submit}>
+        {state.selection.length > 0 ? (
+          <div className="attachments">
+            <span className="chip">
+              {state.selection.join(", ")}
+              <button type="button" title="Clear the selection" onClick={() => post({ kind: "clearSelection" })}>
+                ×
+              </button>
+            </span>
+          </div>
+        ) : null}
         <textarea
           value={draft}
+          rows={2}
           placeholder={state.deployment ? `Ask about ${state.deployment}, or for a new workflow…` : "Describe a workflow…"}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKey}
           disabled={state.connection === "off"}
         />
-        <div className="composer-actions">
-          <label className="composer-status" title="Prefix each message with what the runtime says about the selected deployment">
+        <div className="toolbar">
+          <label title="Send what the runtime says about the selected deployment with each message">
             <input
               type="checkbox"
               checked={state.attachContext}
               disabled={!state.deployment}
               onChange={(event) => post({ kind: "attachContext", value: event.target.checked })}
             />{" "}
-            {state.deployment ? `attach ${state.deployment}` : "no deployment"}
+            {state.deployment ? `Attach ${state.deployment}` : "No deployment selected"}
           </label>
-          <button type="submit" className="send-button" disabled={state.drafting || !draft.trim()} title="Send (Enter)">
-            ↑
+          <span className="grow" />
+          <button type="submit" className="primary send" disabled={state.drafting || !draft.trim()} title="Send (Enter)">
+            Send
           </button>
         </div>
       </form>

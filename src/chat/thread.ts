@@ -50,18 +50,40 @@ export class Thread {
     this.set({ connection: "off" });
   }
 
-  /** Post the operator's message; the daemon echoes it on the stream. */
+  /**
+   * Post the operator's message; the daemon echoes it on the stream.
+   *
+   * The daemon pastes a message into the assistant's pane and checks it took;
+   * an assistant still starting up does not take it, and the daemon says so
+   * after its own few tries. That is worth waiting out — a backend takes a
+   * while to come up — so the send is tried again for a minute or so before
+   * the daemon's words are shown as the last word.
+   */
   async send(text: string, selection: string[]): Promise<boolean> {
     this.set({ problem: null });
-    try {
-      const message = await this.client.send(text, selection);
-      this.place(message);
-      this.set({ drafting: true });
-      return true;
-    } catch (cause) {
-      this.set({ problem: cause instanceof Error ? cause.message : String(cause) });
-      return false;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        const message = await this.client.send(text, selection);
+        this.place(message);
+        this.set({ drafting: true, problem: null });
+        return true;
+      } catch (cause) {
+        const problem = cause instanceof Error ? cause.message : String(cause);
+        if (!/not verified/.test(problem) || attempt >= this.deliveryTries) {
+          this.set({ problem });
+          return false;
+        }
+        this.set({ problem: `The assistant has not accepted the message yet (try ${attempt} of ${this.deliveryTries}); it may still be starting. Waiting…` });
+        await this.sleep(this.deliveryWaitMs);
+      }
     }
+  }
+
+  /** How often, and how long apart, a delivery the daemon could not verify is retried. */
+  deliveryTries = 8;
+  deliveryWaitMs = 8000;
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async follow(signal: AbortSignal): Promise<void> {

@@ -130,6 +130,14 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
   }
 
   private noticeFrom(state: ThreadState): void {
+    if (state.problem && /not verified/.test(state.problem) && !/Waiting/.test(state.problem)) {
+      this.noticed = {
+        text: "The assistant did not take the message. Its pane may be stuck on a prompt, or its backend may not have started; open it to see.",
+        action: "attachTerminal",
+        label: "Open assistant terminal",
+      };
+      return;
+    }
     if (state.problem && /executive assistant is not running/.test(state.problem)) {
       this.noticed = this.launcher.running
         ? {
@@ -328,45 +336,71 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
 function html(webview: vscode.Webview, media: vscode.Uri): string {
   const nonce = randomBytes(16).toString("base64");
   const script = webview.asWebviewUri(vscode.Uri.joinPath(media, "chat.js"));
-  const style = webview.asWebviewUri(vscode.Uri.joinPath(media, "chat.css"));
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:;" />
-<link rel="stylesheet" href="${style}" />
 <style nonce="${nonce}">
-  .page-error { padding: 16px; color: #fecaca; font: 12px ui-sans-serif, system-ui, sans-serif; }
-  .page-error pre { white-space: pre-wrap; color: #f5f2fa; }
+  /* VS Code's own chat, in its own colours: every value is a theme variable. */
   html, body, #root { height: 100%; margin: 0; }
-  body { background: var(--ink); color: var(--text); font: 12px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
+  body { background: var(--vscode-panel-background, var(--vscode-editor-background)); color: var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size, 13px); overflow: hidden; }
   #root { display: flex; flex-direction: column; }
-  .thread-head { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); flex: none; }
-  .thread-head select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 11px; }
-  .thread-head .head-button { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
-  .thread-head .head-button:hover { border-color: var(--purple); }
-  .muted { color: var(--muted); }
-  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; letter-spacing: 0.04em; font-size: 10px; }
-  .pill.live { border-color: #4ade80; color: #4ade80; }
-  .pill.stale { border-color: #facc15; color: #facc15; }
-  .pill.off, .pill.connecting { color: var(--muted); }
-  .messages { padding: 14px 16px; }
-  .message { max-width: 900px; }
-  .messages .empty, .empty { color: var(--muted); padding: 8px 2px; }
-  .waiting { color: var(--muted); font-style: italic; padding: 0 0 8px 38px; }
-  .turn .context-note { margin: -14px 0 16px 38px; color: #6a6672; font-size: 10px; }
-  .proposal-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -10px 0 18px 38px; }
-  .primary-button, .secondary-button { height: 26px; padding: 0 10px; border-radius: 7px; font-size: 11px; cursor: pointer; }
-  .primary-button { border: 0; background: var(--purple); color: white; }
-  .secondary-button { border: 1px solid var(--line); background: transparent; color: var(--text); }
-  .notice { display: flex; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 8px 10px; border: 1px solid rgba(250, 204, 21, 0.4); background: rgba(250, 204, 21, 0.1); border-radius: 9px; font-size: 11.5px; }
-  .problem { margin: 0 16px; color: #fecaca; font-size: 11.5px; }
-  .prompt-box { margin: 10px 12px 12px; max-width: 900px; }
-  .prompt-box textarea { min-height: 64px; }
-  .prompt-box .composer-actions { display: flex; align-items: center; justify-content: space-between; padding: 0 10px 8px 12px; color: #77737f; font-size: 10.5px; }
-  .composer-status input { vertical-align: middle; }
-  .selection-bar { margin: 0 12px; }
+  * { box-sizing: border-box; }
+  .page-error { padding: 16px; color: var(--vscode-errorForeground); }
+  .page-error pre { white-space: pre-wrap; }
+  .muted { color: var(--vscode-descriptionForeground); }
+  .grow { flex: 1; }
+  header { display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border)); flex: none; }
+  header b { font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); }
+  .dot.live { background: var(--vscode-charts-green); }
+  .dot.stale { background: var(--vscode-charts-yellow); }
+  select { background: var(--vscode-dropdown-background); color: var(--vscode-dropdown-foreground); border: 1px solid var(--vscode-dropdown-border, transparent); border-radius: 2px; padding: 2px 4px; font-size: 12px; }
+  button { font-family: inherit; font-size: 12px; border-radius: 2px; padding: 3px 10px; cursor: pointer; border: 1px solid transparent; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  button.primary:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
+  button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+  button.secondary:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
+  .notice { display: flex; align-items: center; gap: 10px; margin: 8px 16px 0; padding: 8px 10px; background: var(--vscode-inputValidation-warningBackground); border: 1px solid var(--vscode-inputValidation-warningBorder); border-radius: 4px; }
+  .thread { flex: 1; overflow: auto; padding: 8px 0; }
+  .empty { padding: 16px 20px; }
+  .empty p { margin: 0 0 6px; }
+  .turn { padding: 8px 20px; }
+  .turn.progress .response-body { color: var(--vscode-descriptionForeground); font-size: 12px; }
+  .who { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .avatar { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 9px; font-weight: 700; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+  .avatar.you { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  .name { font-weight: 600; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 10px; font-size: 11px; font-family: var(--vscode-editor-font-family); background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+  .chip.muted { background: transparent; border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border)); color: var(--vscode-descriptionForeground); font-family: inherit; }
+  .chip button { padding: 0 2px; background: transparent; color: inherit; font-size: 12px; line-height: 1; }
+  .request-body { padding: 8px 12px; border-radius: 4px; white-space: pre-wrap; background: var(--vscode-chat-requestBackground, var(--vscode-editorWidget-background)); border: 1px solid var(--vscode-chat-requestBorder, var(--vscode-widget-border, transparent)); }
+  .response-body { line-height: 1.5; max-width: 900px; }
+  .response-body > :first-child { margin-top: 0; }
+  .response-body > :last-child { margin-bottom: 0; }
+  .response-body p { margin: 0 0 8px; }
+  .response-body a { color: var(--vscode-textLink-foreground); }
+  .response-body code { font-family: var(--vscode-editor-font-family); font-size: 12px; background: var(--vscode-textCodeBlock-background); padding: 1px 4px; border-radius: 3px; }
+  .response-body pre { background: var(--vscode-textCodeBlock-background); padding: 10px 12px; border-radius: 4px; overflow: auto; }
+  .response-body pre code { background: transparent; padding: 0; }
+  .response-body blockquote { margin: 0 0 8px; padding-left: 10px; border-left: 3px solid var(--vscode-textBlockQuote-border); background: var(--vscode-textBlockQuote-background); }
+  .response-body table { border-collapse: collapse; margin-bottom: 8px; }
+  .response-body th, .response-body td { border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border)); padding: 3px 8px; }
+  .response-body ul, .response-body ol { padding-left: 22px; margin: 0 0 8px; }
+  .response-body h1, .response-body h2, .response-body h3 { font-size: 1em; margin: 10px 0 6px; }
+  .actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .problem { margin: 0 20px 6px; color: var(--vscode-errorForeground); font-size: 12px; }
+  .composer { flex: none; margin: 8px 16px 12px; border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, transparent)); border-radius: 6px; background: var(--vscode-input-background); }
+  .composer:focus-within { border-color: var(--vscode-focusBorder); outline: none; }
+  .attachments { padding: 8px 10px 0; }
+  .composer textarea { display: block; width: 100%; resize: none; border: 0; outline: 0; padding: 10px 12px 6px; background: transparent; color: var(--vscode-input-foreground); font-family: inherit; font-size: inherit; line-height: 1.4; }
+  .composer textarea::placeholder { color: var(--vscode-input-placeholderForeground); }
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 0 8px 8px 12px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+  .toolbar label { display: inline-flex; align-items: center; gap: 4px; }
+  .toolbar input { margin: 0; }
 </style>
 </head>
 <body>
