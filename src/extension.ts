@@ -14,6 +14,7 @@ import { OutlineProvider } from "./language/OutlineProvider";
 import type { Guarantee } from "./model/guarantees";
 import { deployProposal, runProgram, stopDeployment } from "./commands/operate";
 import { ChatView } from "./chat/ChatView";
+import { Terminals } from "./Terminals";
 import { dataDir, workspaceFiles } from "./artifacts/files";
 import { ArtifactsProvider } from "./views/ArtifactsProvider";
 import { GuaranteesProvider } from "./views/GuaranteesProvider";
@@ -29,6 +30,7 @@ export type OmarApi = {
   artifacts: ArtifactsProvider;
   guarantees: GuaranteesProvider;
   chat: ChatView;
+  terminals: Terminals;
 };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
@@ -113,10 +115,14 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
   const guarantees = new GuaranteesProvider(session, artifacts);
   const summary = new SummaryProvider(session, artifacts, guarantees);
   const selection = new Selection();
-  const panel = new TopologyPanel(context.extensionUri, session, selection, daemonUrl);
-  const chat = new ChatView(context.extensionUri, session, selection, guarantees, artifacts, launcher);
+  const terminals = new Terminals();
+  const panel = new TopologyPanel(context.extensionUri, session, selection, daemonUrl, (agent) => {
+    void terminals.attachAgent(agent, artifacts.current?.directory ?? null);
+  });
+  const chat = new ChatView(context.extensionUri, session, selection, guarantees, artifacts, launcher, terminals);
   context.subscriptions.push(
     launcher,
+    terminals,
     vscode.commands.registerCommand("omar.startRuntime", async () => {
       const url = session.current.url ?? configuredUrl();
       if (session.current.reach === "connected") {
@@ -301,7 +307,7 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
   // Connect on activation: the address has a default, and when nothing
   // answers there the session starts a runtime rather than asking.
   void session.connect(configuredUrl());
-  return { session, launcher, selection, panel, artifacts, guarantees, chat };
+  return { session, launcher, selection, panel, artifacts, guarantees, chat, terminals };
 }
 
 function sameAddress(a: string, b: string | null): boolean {

@@ -39,6 +39,7 @@ type Outgoing =
   | { kind: "ready" }
   | { kind: "toggle"; component: string }
   | { kind: "view"; which: "live" | "file" }
+  | { kind: "terminal"; agent: string }
   | { kind: "drawn"; nodes: number; error: string | null };
 
 const vscode = acquireVsCodeApi();
@@ -122,6 +123,9 @@ function App() {
             selection={state.selection}
             onToggleComponent={(component) => post({ kind: "toggle", component })}
             highlight={state.highlight ? new Set(state.highlight) : undefined}
+            // Only a live deployment has agents with panes to attach to; a
+            // file's picture and a proposal's have none.
+            onOpenTerminal={state.showing === "live" ? (agent) => post({ kind: "terminal", agent }) : undefined}
           />
         ) : (
           <p className="empty">{state.empty ?? "No picture of this deployment."}</p>

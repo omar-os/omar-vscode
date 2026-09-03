@@ -35,7 +35,10 @@ assistant have panels of their own.
   as chevrons, timers as clocks. It shows the compiled picture of the
   `.omar` file you are editing, redrawn on save, and switches itself to the
   live picture when the selected deployment goes live; a Live / file toggle
-  in its header brings either back. Pan, zoom, click anything to select it.
+  in its header brings either back. Pan, zoom, click anything to select it;
+  double-click a reaction in the live picture to open a terminal on its
+  agent's tmux pane. A pane already open in a terminal is shown, not opened
+  again.
 
 The Teams, Inspector, Artifacts, Guarantees and Events views are out of the
 sidebar for now; what they read still feeds the summary, the topology and
