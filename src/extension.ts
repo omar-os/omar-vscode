@@ -1,20 +1,18 @@
 import * as vscode from "vscode";
 
 import { compileProgram, type Compiled } from "./compile";
-import { diagramOnlySource } from "./client/diagramOnly";
-import { followRun } from "./client/follow";
-import { DiagramWebview, type DiagramState } from "./topology/DiagramWebview";
+
 import { RuntimeSession } from "./runtime/RuntimeSession";
 import { RuntimeLauncher } from "./runtime/RuntimeLauncher";
 import { isRunFinished } from "./client/protocol";
 import { normalizeRuntimeUrl } from "./client/OmarClient";
-import { formatNanos, formatTag } from "./model/format";
 import { DeploymentsProvider } from "./views/DeploymentsProvider";
 import { SummaryProvider } from "./views/SummaryProvider";
 import { TeamsProvider } from "./views/TeamsProvider";
 import { StatusBar } from "./views/StatusBar";
 import { InspectorProvider, Selection } from "./views/Inspector";
-import { MissionControlPanel } from "./topology/MissionControlPanel";
+import { TopologyPanel } from "./topology/TopologyPanel";
+import { OutlineProvider } from "./language/OutlineProvider";
 import type { Guarantee } from "./model/guarantees";
 import { deployProposal, runProgram, stopDeployment } from "./commands/operate";
 import { ChatView } from "./chat/ChatView";
@@ -30,21 +28,22 @@ export type OmarApi = {
   session: RuntimeSession;
   launcher: RuntimeLauncher;
   selection: Selection;
-  panel: MissionControlPanel;
+  panel: TopologyPanel;
   artifacts: ArtifactsProvider;
   guarantees: GuaranteesProvider;
   chat: ChatView;
-  /** The per-file diagram panels. */
-  diagrams?: DiagramPanels;
 };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE);
+  const api = activateMissionControl(context, () => daemonUrl());
   // The daemon, once Mission Control has one, compiles for the editor too;
   // set below, read whenever a program is checked.
   let daemonUrl: () => string | null = () => null;
-  const panels = new DiagramPanels(context, () => daemonUrl());
-  context.subscriptions.push(diagnostics, panels);
+  context.subscriptions.push(
+    diagnostics,
+    vscode.languages.registerDocumentSymbolProvider({ language: LANGUAGE }, new OutlineProvider()),
+  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand("omar.compile", async () => {
@@ -73,28 +72,26 @@ export function activate(context: vscode.ExtensionContext): OmarApi {
 
     vscode.commands.registerCommand("omar.showDiagram", async () => {
       const editor = omarEditor();
-      if (editor) await panels.show(editor.document);
+      if (editor) await api.panel.showFile(editor.document, true);
     }),
 
-    // A diagram tracks the file it was opened for, so editing is enough to
-    // redraw it. Compiling on every keystroke would be a compiler per keystroke.
+    // Compiling on every keystroke would be a compiler per keystroke; a save
+    // is when a program is worth checking. The topology panel redraws itself.
     vscode.workspace.onDidSaveTextDocument(async (document) => {
       if (document.languageId !== LANGUAGE) return;
       if (vscode.workspace.getConfiguration("omar").get<boolean>("compileOnSave", true)) {
         await check(document, diagnostics, daemonUrl());
       }
-      await panels.refresh(document);
     }),
 
     vscode.workspace.onDidCloseTextDocument((document) => diagnostics.delete(document.uri)),
   );
 
-  const api = activateMissionControl(context);
   daemonUrl = () => {
     const { reach, mode, url } = api.session.current;
     return reach === "connected" && mode === "daemon" ? url : null;
   };
-  return { ...api, diagrams: panels };
+  return api;
 }
 
 export function deactivate(): void {}
@@ -105,7 +102,7 @@ export function deactivate(): void {}
  * The views are thin. Each asks the session for what it holds and redraws
  * when told; none keeps state of its own, so none can disagree with another.
  */
-function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
+function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () => string | null): OmarApi {
   const session = new RuntimeSession();
   const launcher = new RuntimeLauncher();
   session.launcher = (url, reason) => launcher.start(url, reason);
@@ -122,7 +119,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
   const selection = new Selection();
   const inspector = new InspectorProvider(session, selection, guarantees);
   const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
-  const panel = new MissionControlPanel(context.extensionUri, session, selection);
+  const panel = new TopologyPanel(context.extensionUri, session, selection, daemonUrl);
   const chat = new ChatView(context.extensionUri, session, selection, guarantees, artifacts, launcher);
   context.subscriptions.push(
     launcher,
@@ -223,6 +220,8 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
       inspectorView.description = inspector.title() ?? undefined;
       void vscode.commands.executeCommand("setContext", "omar.inspecting", selection.current !== null);
     }),
+    vscode.commands.registerCommand("omar.openTopology", () => panel.show()),
+    // The old name, for anyone who bound it.
     vscode.commands.registerCommand("omar.openMissionControl", () => panel.show()),
 
     vscode.commands.registerCommand("omar.connect", async (url?: string) => {
@@ -257,7 +256,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
         (await vscode.window.showInputBox({
           title: "Follow a diagram server (read only)",
           prompt: "Address printed by omar run --diagram-server",
-          value: vscode.workspace.getConfiguration("omar").get<string>("diagramServerUrl", "") || "http://127.0.0.1:7341",
+          value: "http://127.0.0.1:7341",
         }));
       if (chosen) await session.connectDiagram(chosen);
     }),
@@ -294,7 +293,7 @@ function activateMissionControl(context: vscode.ExtensionContext): OmarApi {
         state.reach === "disconnected"
           ? { label: "$(plug) Connect to runtime", command: "omar.connect" }
           : { label: "$(debug-disconnect) Disconnect", command: "omar.disconnect" },
-        { label: "$(type-hierarchy) Open Mission Control", command: "omar.openMissionControl" },
+        { label: "$(type-hierarchy) Open Topology", command: "omar.openTopology" },
         ...(state.capabilities.run ? [{ label: "$(play) Run the open program", command: "omar.runProgram" }] : []),
         ...(state.capabilities.stop && state.live && !isRunFinished(state.live.record.status)
           ? [{ label: "$(debug-stop) Stop deployment", command: "omar.stopDeployment" }]
@@ -381,125 +380,4 @@ async function check(
         }),
   );
   return result;
-}
-
-/**
- * The diagram windows, one per program.
- *
- * A panel shows the compiled program the way the daemon's preview would draw
- * it, and follows a run when one is listening at `omar.diagramServerUrl`: the
- * same diagram either way, the running one carrying what is happening on top
- * of what exists.
- */
-class DiagramPanels implements vscode.Disposable {
-  private readonly panels = new Map<string, DiagramWebview>();
-  private readonly streams = new Map<string, AbortController>();
-  private readonly shown = new Map<string, DiagramState>();
-
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly daemonUrl: () => string | null,
-  ) {}
-
-  /** What the panel for a document last showed; for a test. */
-  stateOf(document: vscode.Uri): DiagramState | null {
-    return this.shown.get(document.toString()) ?? null;
-  }
-
-  async show(document: vscode.TextDocument): Promise<void> {
-    const key = document.uri.toString();
-    let panel = this.panels.get(key);
-    if (!panel) {
-      panel = new DiagramWebview(
-        this.context.extensionUri,
-        "omar.diagram",
-        `Topology · ${basename(document)}`,
-        () => {},
-        () => {
-          this.panels.delete(key);
-          this.streams.get(key)?.abort();
-          this.streams.delete(key);
-        },
-      );
-      this.panels.set(key, panel);
-    }
-    panel.show(vscode.ViewColumn.Beside, true);
-    await this.refresh(document);
-  }
-
-  async refresh(document: vscode.TextDocument): Promise<void> {
-    const key = document.uri.toString();
-    const panel = this.panels.get(key);
-    if (!panel) return;
-
-    const result = await compileProgram(
-      document.getText(),
-      basename(document),
-      this.daemonUrl(),
-      vscode.workspace.getConfiguration("omar").get<string>("compilerPath", "omarc"),
-    );
-    const show = (state: DiagramState) => {
-      this.shown.set(key, state);
-      panel.post(state);
-    };
-    if (!result.ok) {
-      show({
-        snapshot: null, selection: [], highlight: null, team: basename(document), status: "", connection: null,
-        detail: null, tag: "", lag: "", empty: `Does not compile:\n${result.problems.map((problem) => problem.message).join("\n")}`,
-      });
-      return;
-    }
-    const compiled = result.snapshot;
-    show({
-      snapshot: compiled, selection: [], highlight: null, team: compiled.team, status: `compiled by ${result.by}`, connection: "compiled",
-      detail: null, tag: "", lag: "", empty: null,
-    });
-    await this.follow(key, panel, compiled.team);
-  }
-
-  /**
-   * Follow a running topology, if one is listening. When nothing is there the
-   * panel keeps the compiled picture, which is the honest thing to show: the
-   * program exists, it just is not running.
-   */
-  private async follow(key: string, panel: DiagramWebview, team: string): Promise<void> {
-    this.streams.get(key)?.abort();
-    const url = vscode.workspace.getConfiguration("omar").get<string>("diagramServerUrl", "");
-    if (!url) return;
-    const abort = new AbortController();
-    this.streams.set(key, abort);
-    try {
-      const { source, recordOf, client } = diagramOnlySource(url);
-      const snapshot = await client.snapshot(abort.signal);
-      if (snapshot.team !== team) {
-        // A different program is running. Saying so beats quietly drawing it
-        // as if it were the file on screen.
-        panel.post({
-          snapshot: null, selection: [], highlight: null, team, status: "", connection: null, detail: null, tag: "", lag: "",
-          empty: `A different program is running at ${client.url}: ${snapshot.team}.`,
-        });
-        return;
-      }
-      void followRun(
-        recordOf(snapshot),
-        source,
-        {
-          onChange: (live) =>
-            panel.post({
-              snapshot: live.snapshot, selection: [], highlight: null, team, status: live.record.status,
-              connection: live.connection, detail: live.detail,
-              tag: live.snapshot ? formatTag(live.snapshot.current_tag) : "", lag: live.snapshot ? formatNanos(live.snapshot.lag) : "", empty: null,
-            }),
-        },
-        abort.signal,
-      );
-    } catch {
-      // Not running, or not reachable. The compiled picture stands.
-    }
-  }
-
-  dispose(): void {
-    for (const stream of this.streams.values()) stream.abort();
-    for (const panel of this.panels.values()) panel.dispose();
-  }
 }

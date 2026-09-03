@@ -62,7 +62,7 @@ async function run() {
 
     // The topology panel is the web app's own diagram, bundled: it is handed
     // the snapshot, and it reports back what it drew once ELK has laid it out.
-    await vscode.commands.executeCommand("omar.openMissionControl");
+    await vscode.commands.executeCommand("omar.openTopology");
     assert.equal(panel.state().connection, "live");
     assert.equal(panel.state().snapshot.reactions.find((reaction) => reaction.id === "reaction::watch.reaction.0").status, "running");
     await until(() => panel.drawn !== null, "the diagram to report what it drew", 30_000);
@@ -115,6 +115,17 @@ async function run() {
     assert.match(sent.text, /please propose something$/);
     assert.deepEqual(sent.selection, ["src.go"], "the inspected component is the selection");
     assert.equal(chat.state.drafting, false, "a proposal ends the wait");
+    await until(() => chat.assistantName === "claude", "the assistant's backend to be named");
+    {
+      const original = vscode.window.showWarningMessage;
+      vscode.window.showWarningMessage = async (message, options, ...items) => items[0];
+      try {
+        await chat.act("switchBackend:codex");
+      } finally {
+        vscode.window.showWarningMessage = original;
+      }
+    }
+    assert.equal(chat.assistantName, "codex", "the assistant now runs on the chosen backend");
     const proposal = chat.messages.find((message) => message.design);
     await vscode.commands.executeCommand("omar.previewProposal", proposal.sequence);
     assert.equal(panel.state().connection, "proposal");
@@ -146,11 +157,11 @@ async function run() {
       const document = await vscode.workspace.openTextDocument({ language: "omar", content: "team T {}" });
       await vscode.window.showTextDocument(document);
       await vscode.commands.executeCommand("omar.showDiagram");
-      await until(() => api.diagrams.stateOf(document.uri)?.snapshot, "the file diagram to be drawn by the daemon");
-      const drawn = api.diagrams.stateOf(document.uri);
+      await until(() => panel.state().showing === "file" && panel.state().snapshot, "the file to be drawn by the daemon");
+      const drawn = panel.state();
       assert.equal(drawn.connection, "compiled");
-      assert.equal(drawn.status, "compiled by daemon");
       assert.equal(drawn.snapshot.team, "program");
+      assert.equal(drawn.views.live, true, "the live picture is still on offer");
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
     }
 

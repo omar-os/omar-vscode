@@ -58,7 +58,7 @@
       },
       {
         "command": "omar.showDiagram",
-        "title": "OMAR: Show topology diagram",
+        "title": "OMAR: Show Topology",
         "icon": "$(type-hierarchy)"
       },
       {
@@ -90,8 +90,8 @@
         "title": "OMAR: Mission Control Menu"
       },
       {
-        "command": "omar.openMissionControl",
-        "title": "OMAR: Open Mission Control",
+        "command": "omar.openTopology",
+        "title": "OMAR: Open Topology",
         "icon": "$(type-hierarchy)"
       },
       {
@@ -186,7 +186,7 @@
           "group": "navigation@0"
         },
         {
-          "command": "omar.openMissionControl",
+          "command": "omar.openTopology",
           "when": "view == omar.deployments",
           "group": "navigation@0"
         },
@@ -319,11 +319,6 @@
           "type": "string",
           "default": "omarc",
           "description": "Path to the omarc binary. Resolved on PATH when it is a bare name."
-        },
-        "omar.diagramServerUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Address of a running diagram server, for example http://127.0.0.1:7341. When set, the diagram follows the run rather than showing the compiled topology alone."
         },
         "omar.compileOnSave": {
           "type": "boolean",
