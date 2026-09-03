@@ -23,6 +23,8 @@ type State = {
   problem: string | null;
   /** The backend the assistant runs on, or null when unknown. */
   assistant: string | null;
+  /** The backends it could run on instead. */
+  backends: string[];
   /** Component names the next message will carry. */
   selection: string[];
   /** Whether a deployment is selected, so context can be attached. */
@@ -91,7 +93,27 @@ function App() {
       <header className="thread-head">
         <b>Assistant</b>
         <span className={`pill ${state.connection}`}>{state.connection.toUpperCase()}</span>
-        {state.assistant ? <span className="muted">{state.assistant}</span> : null}
+        {state.backends.length > 0 ? (
+          <select
+            value={state.assistant ?? ""}
+            title="Which backend the assistant runs on; changing it restarts the assistant"
+            onChange={(event) => post({ kind: "action", action: `switchBackend:${event.target.value}` })}
+          >
+            {state.assistant && !state.backends.includes(state.assistant) ? <option value={state.assistant}>{state.assistant}</option> : null}
+            {state.backends.map((backend) => (
+              <option key={backend} value={backend}>
+                {backend}
+              </option>
+            ))}
+          </select>
+        ) : state.assistant ? (
+          <span className="muted">{state.assistant}</span>
+        ) : null}
+        {state.connection === "live" ? (
+          <button type="button" className="head-button" title="Open a terminal on the assistant's tmux pane" onClick={() => post({ kind: "action", action: "attachTerminal" })}>
+            Terminal
+          </button>
+        ) : null}
       </header>
       {state.notice ? (
         <div className="notice">

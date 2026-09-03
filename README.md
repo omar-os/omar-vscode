@@ -13,7 +13,9 @@ what it is running:
 
 - **Assistant** (in the panel, next to the terminal; `OMAR: Open Assistant`)
   — the thread with the executive assistant, the same one the web Mission
-  Control talks to. Ask for a workflow and it proposes a complete
+  Control talks to. Its header names the backend the assistant runs on and
+  lets you move it to another (which restarts it), and **Terminal** opens
+  the assistant's own tmux pane in a VS Code terminal. Ask for a workflow and it proposes a complete
   program the daemon has compiled; preview it in the diagram panel, open its
   source, deploy it. Ask about the selected deployment and the message
   carries the runtime's own account of it — each reaction's state, the port
@@ -27,11 +29,14 @@ what it is running:
   lag, guarantees at a glance, and whether the picture is **LIVE**, **STALE**
   (the event stream broke; what is shown is what was last known) or
   **FINAL**.
-- **Mission Control** panel — the topology, drawn by the very component the
-  web Mission Control draws it with (vendored from the omar repository and
-  bundled into the webview): teams as containers, ports on their boundary,
-  reactions as chevrons, timers as clocks, each reaction carrying its state
-  as it changes. Pan, zoom, click anything to inspect it.
+- **Topology** panel (`OMAR: Open Topology`, or the diagram button on an
+  `.omar` editor) — one picture, drawn by the very component the web
+  Mission Control draws with (vendored from the omar repository and bundled
+  into the webview): teams as containers, ports on their boundary, reactions
+  as chevrons, timers as clocks. It shows the compiled picture of the
+  `.omar` file you are editing, redrawn on save, and switches itself to the
+  live picture when the selected deployment goes live; a Live / file toggle
+  in its header brings either back. Pan, zoom, click anything to inspect it.
 - **Teams** — instances, their agents, and each agent's reactions with their
   real states.
 - **Inspector** — what the runtime knows about the selected thing: a
@@ -115,12 +120,12 @@ the source. The connected runtime does the compiling (`POST
 runtime, `omarc` on `PATH` or at `omar.compilerPath` is run directly. Either
 way it is the real compiler, so nothing passes here and is refused later.
 
-**Draws the topology of a file.** `OMAR: Show topology diagram` opens a panel
-beside the editor showing what the program describes, without running it —
-the daemon's own preview when one is connected.
-Save and it redraws. With `omar.diagramServerUrl` set it follows that run;
-Mission Control's **Follow a Diagram Server** command does the same, read
-only, without a daemon.
+**Outlines a file.** The Explorer's Outline lists each team and main block
+with its ports, timers, prompts and instances, and jumps to them.
+
+**Draws a file.** `OMAR: Show Topology` puts the compiled picture of the
+program in the Topology panel, the daemon's own preview when one is
+connected, without running anything.
 
 ## Settings
 
@@ -133,7 +138,6 @@ only, without a daemon.
 | `omar.dataDir` | `~/.omar` | The runtime's data directory on the extension host; artifacts are read from it. |
 | `omar.cliPath` | `omar` | Used to start the runtime and to stop a deployment. |
 | `omar.compilerPath` | `omarc` | Resolved on `PATH` when it is a bare name; a path is handed to the started runtime as `OMARC_BIN`. |
-| `omar.diagramServerUrl` | *(none)* | e.g. `http://127.0.0.1:7341`, for the per-file diagram. |
 | `omar.compileOnSave` | `true` | Report problems as diagnostics on save. |
 
 ## Diagnostics are positioned by guessing

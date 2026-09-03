@@ -5,7 +5,7 @@ async function run() {
   const api = await vscode.extensions.getExtension("omar-os.omar-vscode").activate();
   await vscode.commands.executeCommand("omar.connect", process.env.OMAR_URL);
   await vscode.commands.executeCommand("workbench.view.extension.omar");
-  await vscode.commands.executeCommand("omar.openMissionControl");
+  await vscode.commands.executeCommand("omar.openTopology");
   const deadline = Date.now() + 20000;
   while (Date.now() < deadline && !api.session.current.live?.snapshot) await new Promise((r) => setTimeout(r, 200));
   await vscode.commands.executeCommand("omar.inspect", process.env.OMAR_INSPECT || null);

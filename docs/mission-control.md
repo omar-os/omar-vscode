@@ -72,9 +72,15 @@ the inspector (`src/topology/components.ts`). After ELK settles, the page
 reports how many nodes it drew, which is what the headless VS Code run
 checks.
 
-`OMAR: Show topology diagram` for a file draws the same component from a
-snapshot read off the bytecode (`src/diagram.ts`), which is tested to equal
-the daemon's own `/v1/programs/check` preview for the same program.
+There is one panel (`src/topology/TopologyPanel.ts`) and three pictures it
+can show, in this order of precedence: a proposal being previewed; the live
+picture of the selected deployment; the compiled picture of an `.omar` file
+— the active editor's, or the one `OMAR: Show Topology` was run on, redrawn
+on save, compiled by the connected daemon (`POST /v1/programs/check`) or by
+`omarc` read into the same shape (`src/diagram.ts`, tested to equal the
+daemon's preview). When a deployment goes live the panel switches to it;
+the header's toggle brings the file back and Live returns. The canvas is
+light here where the web app's is dark, so the dark ports read.
 
 To move to a newer web diagram: `git -C vendor/omar checkout <commit>`,
 `npm run build`, and commit the submodule pointer. Clone with
@@ -163,6 +169,12 @@ place of the run, marked PROPOSAL until cleared. Open program opens the
 source as an `.omar` document. Deploy asks for any open input the assistant
 left out, then `POST /v1/runs` with the assistant's program and inputs, and
 selects the run. The operator deploys; the assistant never does.
+
+**Backend and pane.** The header lists the backends the daemon offers
+(`GET /v1/agent`); choosing another restarts the assistant on it
+(`POST /v1/agent/backend`). Terminal opens `tmux attach-session -t
+<prefix>ea-<ea>` in a VS Code terminal, on the extension host, which under
+Remote SSH is where the assistant is.
 
 **No assistant.** A daemon started with `--no-ea` refuses chat with "the
 executive assistant is not running"; the view shows that and, when the

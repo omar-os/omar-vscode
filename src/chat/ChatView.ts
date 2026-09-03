@@ -1,6 +1,10 @@
+import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 import * as vscode from "vscode";
+
+import { activeEa } from "../artifacts/store";
+import { dataDir, workspaceFiles } from "../artifacts/files";
 
 import { ChatClient, type Assistant, type ChatMessage } from "../client/chat";
 import type { RuntimeLauncher } from "../runtime/RuntimeLauncher";
@@ -81,6 +85,10 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
   /** What the view is telling the operator it cannot do, if anything. */
   get notice(): Notice | null {
     return this.noticed;
+  }
+
+  get assistantName(): string | null {
+    return this.assistant?.backend ?? null;
   }
 
   /** Follow the connected daemon's thread, or none. */
@@ -170,29 +178,72 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
         break;
       }
       case "restartAssistant": {
-        if (!this.client) return;
         const backend = this.assistant?.backend ?? this.assistant?.available[0];
         if (!backend) {
           vscode.window.showWarningMessage("The runtime did not say which backend the assistant runs on.");
           return;
         }
-        const confirmed = await vscode.window.showWarningMessage(
-          `Restart the assistant on ${backend}? Its current session is lost.`,
-          { modal: true },
-          "Restart",
-        );
-        if (confirmed !== "Restart") return;
-        try {
-          await this.client.restartAssistant(backend);
-          this.launcher.assistantWarning = null;
-          this.noticed = null;
-          this.post();
-        } catch (cause) {
-          vscode.window.showErrorMessage(`The runtime refused to restart the assistant: ${cause instanceof Error ? cause.message : String(cause)}`);
-        }
+        await this.relaunch(backend, `Restart the assistant on ${backend}? Its current session is lost.`);
         break;
       }
+      case "attachTerminal":
+        await this.attachTerminal();
+        break;
+      default:
+        if (action.startsWith("switchBackend:")) {
+          const backend = action.slice("switchBackend:".length);
+          if (backend && backend !== this.assistant?.backend) {
+            await this.relaunch(backend, `Move the assistant to ${backend}? Its current session is lost.`);
+          }
+        }
     }
+  }
+
+  /** The daemon relaunches the assistant on a backend; nothing of its session survives. */
+  private async relaunch(backend: string, question: string): Promise<void> {
+    if (!this.client) return;
+    const confirmed = await vscode.window.showWarningMessage(question, { modal: true }, "Restart");
+    if (confirmed !== "Restart") return;
+    try {
+      await this.client.restartAssistant(backend);
+      this.launcher.assistantWarning = null;
+      this.noticed = null;
+      this.assistant = { backend, available: this.assistant?.available ?? [backend] };
+      this.post();
+    } catch (cause) {
+      vscode.window.showErrorMessage(`The runtime refused to restart the assistant: ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+  }
+
+  /**
+   * A terminal on the assistant's own tmux pane, where it runs and prints.
+   *
+   * The session is named by the runtime — `<prefix>ea-<ea>` — and found by
+   * asking tmux, on this extension host, which under Remote SSH is the
+   * machine the assistant is on.
+   */
+  private async attachTerminal(): Promise<void> {
+    const ea = await activeEa(workspaceFiles, dataDir());
+    const sessions = await new Promise<string[]>((resolve) => {
+      execFile("tmux", ["list-sessions", "-F", "#S"], { timeout: 5000 }, (error, stdout) => {
+        resolve(error ? [] : stdout.split("\n").map((line) => line.trim()).filter(Boolean));
+      });
+    });
+    const session = sessions.find((name) => name.endsWith(`ea-${ea}`)) ?? sessions.find((name) => /ea-\d+$/.test(name));
+    if (!session) {
+      vscode.window.showWarningMessage(
+        sessions.length === 0
+          ? "No tmux sessions were found on this machine; the assistant runs in one, so either tmux is not on PATH or no assistant is running."
+          : `No assistant session for EA ${ea} among the tmux sessions: ${sessions.join(", ")}.`,
+      );
+      return;
+    }
+    const terminal = vscode.window.createTerminal({
+      name: `OMAR assistant · ${session}`,
+      shellPath: "tmux",
+      shellArgs: ["attach-session", "-t", session],
+    });
+    terminal.show();
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -257,6 +308,7 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
       drafting: this.threadState.drafting,
       problem: this.threadState.problem,
       assistant: this.assistant?.backend ?? null,
+      backends: this.assistant?.available ?? [],
       selection: this.selection.current ? [componentName(this.selection.current)] : [],
       deployment: run && this.session.current.mode === "daemon" ? run.team : null,
       attachContext: this.attachContext,
@@ -289,6 +341,9 @@ function html(webview: vscode.Webview, media: vscode.Uri): string {
   body { background: var(--ink); color: var(--text); font: 12px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
   #root { display: flex; flex-direction: column; }
   .thread-head { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); flex: none; }
+  .thread-head select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; font-size: 11px; }
+  .thread-head .head-button { border: 1px solid var(--line); background: transparent; color: var(--text); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+  .thread-head .head-button:hover { border-color: var(--purple); }
   .muted { color: var(--muted); }
   .pill { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; letter-spacing: 0.04em; font-size: 10px; }
   .pill.live { border-color: #4ade80; color: #4ade80; }

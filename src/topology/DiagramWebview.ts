@@ -26,6 +26,9 @@ export type DiagramState = {
   tag: string;
   lag: string;
   empty: string | null;
+  /** Which picture this is, and which others are on offer. */
+  showing: "proposal" | "live" | "file" | "none";
+  views: { live: boolean; file: string | null };
 };
 
 /** What the page last reported drawing; for a test, mostly. */
@@ -45,6 +48,8 @@ export class DiagramWebview implements vscode.Disposable {
     private readonly title: string,
     private readonly onToggle: (component: string) => void,
     private readonly onDispose?: () => void,
+    /** The reader asked for the other picture: `live` or `file`. */
+    private readonly onView?: (which: "live" | "file") => void,
   ) {}
 
   get open(): boolean {
@@ -66,13 +71,16 @@ export class DiagramWebview implements vscode.Disposable {
     panel.iconPath = new vscode.ThemeIcon("type-hierarchy");
     panel.webview.html = html(panel.webview, media);
     panel.webview.onDidReceiveMessage(
-      (message: { kind?: string; component?: string; nodes?: number; error?: string | null }) => {
+      (message: { kind?: string; component?: string; which?: string; nodes?: number; error?: string | null }) => {
         switch (message.kind) {
           case "ready":
             if (this.last) void panel.webview.postMessage({ kind: "state", state: this.last });
             break;
           case "toggle":
             if (typeof message.component === "string") this.onToggle(message.component);
+            break;
+          case "view":
+            if (message.which === "live" || message.which === "file") this.onView?.(message.which);
             break;
           case "drawn":
             this.drawn = { nodes: message.nodes ?? 0, error: message.error ?? null };
@@ -138,10 +146,19 @@ function html(webview: vscode.Webview, media: vscode.Uri): string {
   .pill { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; letter-spacing: 0.04em; font-size: 11px; }
   .pill.live { border-color: #4ade80; color: #4ade80; }
   .pill.stale { border-color: #facc15; color: #facc15; }
-  .pill.compiled, .pill.final { color: var(--muted); }
+  .pill.final { color: var(--muted); }
   .banner { flex: none; padding: 6px 12px; background: rgba(250, 204, 21, 0.12); border-bottom: 1px solid rgba(250, 204, 21, 0.4); }
   .banner b { margin-right: 8px; }
-  .diagram-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+  /* The web app draws on its dark ink; here the canvas is light, so the dark
+     ports and edges read against it. The boxes are white either way. */
+  .diagram-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; background: #e8e8ed; }
+  .diagram-panel .diagram-wrap, .diagram-panel .diagram-canvas { background: #e8e8ed; }
+  .diagram-panel .diagram-legend { background: rgba(255, 255, 255, 0.85); color: #2c2b30; }
+  .diagram-panel .diagram-zoom button { background: rgba(255, 255, 255, 0.9); color: #2c2b30; border-color: #b3b1b8; }
+  .diagram-panel .empty { color: #4b4950; }
+  .views { margin-left: auto; display: flex; gap: 4px; }
+  .views button { border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 6px; padding: 1px 8px; font-size: 10.5px; cursor: pointer; }
+  .views button.on { color: var(--text); border-color: var(--purple); }
   .empty { padding: 16px; color: var(--muted); }
 </style>
 </head>

@@ -29,11 +29,14 @@ type State = {
   lag: string;
   /** What to say when there is no snapshot. */
   empty: string | null;
+  showing: "proposal" | "live" | "file" | "none";
+  views: { live: boolean; file: string | null };
 };
 
 type Outgoing =
   | { kind: "ready" }
   | { kind: "toggle"; component: string }
+  | { kind: "view"; which: "live" | "file" }
   | { kind: "drawn"; nodes: number; error: string | null };
 
 const vscode = acquireVsCodeApi<State>();
@@ -90,10 +93,17 @@ function App() {
     <>
       <header>
         <b>{state.team || "(unnamed)"}</b>
-        {state.connection ? <span className={`pill ${connection}`}>{connection.toUpperCase()}</span> : null}
+        {state.showing === "file" ? <span className="muted">{state.detail}</span> : null}
+        {state.connection && state.connection !== "compiled" ? <span className={`pill ${connection}`}>{connection.toUpperCase()}</span> : null}
         {state.status ? <span className="muted">{state.status.toUpperCase()}</span> : null}
         {state.tag ? <span className="muted">t = {state.tag}</span> : null}
         {state.lag && state.lag !== "—" ? <span className="muted">lag {state.lag}</span> : null}
+        {state.showing !== "proposal" && state.views.live && state.views.file ? (
+          <span className="views">
+            <button type="button" className={state.showing === "live" ? "on" : ""} onClick={() => post({ kind: "view", which: "live" })}>Live</button>
+            <button type="button" className={state.showing === "file" ? "on" : ""} onClick={() => post({ kind: "view", which: "file" })}>{state.views.file}</button>
+          </span>
+        ) : null}
       </header>
       {connection === "stale" ? (
         <div className="banner">
