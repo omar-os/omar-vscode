@@ -108,12 +108,16 @@ triggers and effects, connections and their delays, `main` blocks and the teams
 they instantiate. `$(port)` inside a prompt body is marked as the interpolation
 it is rather than as more string.
 
-**Compiles with `omarc`.** `OMAR: Compile to bytecode` writes the bytecode
-beside the source. On save, the same compile runs to report problems as
-diagnostics — the real compiler, so nothing passes here and is refused later.
+**Compiles.** On save, the program is checked and problems reported as
+diagnostics; `OMAR: Compile to bytecode` writes the compiled picture beside
+the source. The connected runtime does the compiling (`POST
+/v1/programs/check`), so nothing else needs to be installed; without a
+runtime, `omarc` on `PATH` or at `omar.compilerPath` is run directly. Either
+way it is the real compiler, so nothing passes here and is refused later.
 
 **Draws the topology of a file.** `OMAR: Show topology diagram` opens a panel
-beside the editor showing what the program describes, without running it.
+beside the editor showing what the program describes, without running it —
+the daemon's own preview when one is connected.
 Save and it redraws. With `omar.diagramServerUrl` set it follows that run;
 Mission Control's **Follow a Diagram Server** command does the same, read
 only, without a daemon.

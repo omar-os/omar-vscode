@@ -90,7 +90,7 @@ function App() {
     <>
       <header>
         <b>{state.team || "(unnamed)"}</b>
-        <span className={`pill ${connection}`}>{connection.toUpperCase()}</span>
+        {state.connection ? <span className={`pill ${connection}`}>{connection.toUpperCase()}</span> : null}
         {state.status ? <span className="muted">{state.status.toUpperCase()}</span> : null}
         {state.tag ? <span className="muted">t = {state.tag}</span> : null}
         {state.lag && state.lag !== "—" ? <span className="muted">lag {state.lag}</span> : null}

@@ -1,10 +1,9 @@
 import * as vscode from "vscode";
 
-import { compile } from "./omarc";
-import { fromBytecode } from "./diagram";
+import { compileProgram, type Compiled } from "./compile";
 import { diagramOnlySource } from "./client/diagramOnly";
 import { followRun } from "./client/follow";
-import { DiagramWebview } from "./topology/DiagramWebview";
+import { DiagramWebview, type DiagramState } from "./topology/DiagramWebview";
 import { RuntimeSession } from "./runtime/RuntimeSession";
 import { RuntimeLauncher } from "./runtime/RuntimeLauncher";
 import { isRunFinished } from "./client/protocol";
@@ -35,18 +34,23 @@ export type OmarApi = {
   artifacts: ArtifactsProvider;
   guarantees: GuaranteesProvider;
   chat: ChatView;
+  /** The per-file diagram panels. */
+  diagrams?: DiagramPanels;
 };
 
 export function activate(context: vscode.ExtensionContext): OmarApi {
   const diagnostics = vscode.languages.createDiagnosticCollection(LANGUAGE);
-  const panels = new DiagramPanels(context, diagnostics);
+  // The daemon, once Mission Control has one, compiles for the editor too;
+  // set below, read whenever a program is checked.
+  let daemonUrl: () => string | null = () => null;
+  const panels = new DiagramPanels(context, () => daemonUrl());
   context.subscriptions.push(diagnostics, panels);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("omar.compile", async () => {
       const editor = omarEditor();
       if (!editor) return;
-      const result = await check(editor.document, diagnostics);
+      const result = await check(editor.document, diagnostics, daemonUrl());
       if (!result.ok) {
         vscode.window.showErrorMessage(
           `${result.problems.length} problem${result.problems.length > 1 ? "s" : ""} in ${basename(editor.document)}.`,
@@ -54,17 +58,16 @@ export function activate(context: vscode.ExtensionContext): OmarApi {
         return;
       }
       // Written beside the source, which is where someone looking for it will
-      // look. The runtime compiles to a temporary of its own and does not read
-      // this; it is here to be inspected.
+      // look: the compiled picture, as the daemon or the compiler drew it.
       const target = editor.document.uri.with({
         path: editor.document.uri.path.replace(/\.omar$/, ".json"),
       });
       await vscode.workspace.fs.writeFile(
         target,
-        Buffer.from(`${JSON.stringify(result.bytecode, null, 2)}\n`),
+        Buffer.from(`${JSON.stringify(result.snapshot, null, 2)}\n`),
       );
       vscode.window.showInformationMessage(
-        `Compiled ${result.team} to ${basename({ uri: target } as vscode.TextDocument)}.`,
+        `Compiled ${result.snapshot.team} (by ${result.by}) to ${basename({ uri: target } as vscode.TextDocument)}.`,
       );
     }),
 
@@ -78,7 +81,7 @@ export function activate(context: vscode.ExtensionContext): OmarApi {
     vscode.workspace.onDidSaveTextDocument(async (document) => {
       if (document.languageId !== LANGUAGE) return;
       if (vscode.workspace.getConfiguration("omar").get<boolean>("compileOnSave", true)) {
-        await check(document, diagnostics);
+        await check(document, diagnostics, daemonUrl());
       }
       await panels.refresh(document);
     }),
@@ -86,7 +89,12 @@ export function activate(context: vscode.ExtensionContext): OmarApi {
     vscode.workspace.onDidCloseTextDocument((document) => diagnostics.delete(document.uri)),
   );
 
-  return activateMissionControl(context);
+  const api = activateMissionControl(context);
+  daemonUrl = () => {
+    const { reach, mode, url } = api.session.current;
+    return reach === "connected" && mode === "daemon" ? url : null;
+  };
+  return { ...api, diagrams: panels };
 }
 
 export function deactivate(): void {}
@@ -345,12 +353,13 @@ function basename(document: vscode.TextDocument): string {
 async function check(
   document: vscode.TextDocument,
   diagnostics: vscode.DiagnosticCollection,
-): Promise<Awaited<ReturnType<typeof compile>>> {
+  daemonUrl: string | null,
+): Promise<Compiled> {
   const compilerPath = vscode.workspace
     .getConfiguration("omar")
     .get<string>("compilerPath", "omarc");
 
-  const result = await compile(compilerPath, document.getText(), basename(document));
+  const result = await compileProgram(document.getText(), basename(document), daemonUrl, compilerPath);
   diagnostics.set(
     document.uri,
     result.ok
@@ -367,7 +376,7 @@ async function check(
             problem.message,
             vscode.DiagnosticSeverity.Error,
           );
-          diagnostic.source = "omarc";
+          diagnostic.source = result.by === "daemon" ? "omar serve" : "omarc";
           return diagnostic;
         }),
   );
@@ -385,11 +394,17 @@ async function check(
 class DiagramPanels implements vscode.Disposable {
   private readonly panels = new Map<string, DiagramWebview>();
   private readonly streams = new Map<string, AbortController>();
+  private readonly shown = new Map<string, DiagramState>();
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private readonly diagnostics: vscode.DiagnosticCollection,
+    private readonly daemonUrl: () => string | null,
   ) {}
+
+  /** What the panel for a document last showed; for a test. */
+  stateOf(document: vscode.Uri): DiagramState | null {
+    return this.shown.get(document.toString()) ?? null;
+  }
 
   async show(document: vscode.TextDocument): Promise<void> {
     const key = document.uri.toString();
@@ -417,21 +432,26 @@ class DiagramPanels implements vscode.Disposable {
     const panel = this.panels.get(key);
     if (!panel) return;
 
-    const result = await compile(
-      vscode.workspace.getConfiguration("omar").get<string>("compilerPath", "omarc"),
+    const result = await compileProgram(
       document.getText(),
       basename(document),
+      this.daemonUrl(),
+      vscode.workspace.getConfiguration("omar").get<string>("compilerPath", "omarc"),
     );
+    const show = (state: DiagramState) => {
+      this.shown.set(key, state);
+      panel.post(state);
+    };
     if (!result.ok) {
-      panel.post({
+      show({
         snapshot: null, selection: [], highlight: null, team: basename(document), status: "", connection: null,
         detail: null, tag: "", lag: "", empty: `Does not compile:\n${result.problems.map((problem) => problem.message).join("\n")}`,
       });
       return;
     }
-    const compiled = fromBytecode(result.bytecode);
-    panel.post({
-      snapshot: compiled, selection: [], highlight: null, team: compiled.team, status: "", connection: "compiled",
+    const compiled = result.snapshot;
+    show({
+      snapshot: compiled, selection: [], highlight: null, team: compiled.team, status: `compiled by ${result.by}`, connection: "compiled",
       detail: null, tag: "", lag: "", empty: null,
     });
     await this.follow(key, panel, compiled.team);
