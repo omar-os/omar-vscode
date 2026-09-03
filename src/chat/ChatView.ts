@@ -1,10 +1,8 @@
-import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 
 import * as vscode from "vscode";
 
-import { activeEa } from "../artifacts/store";
-import { dataDir, workspaceFiles } from "../artifacts/files";
+import type { Terminals } from "../Terminals";
 
 import { ChatClient, type Assistant, type ChatMessage } from "../client/chat";
 import type { RuntimeLauncher } from "../runtime/RuntimeLauncher";
@@ -57,6 +55,7 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
     private readonly guarantees: GuaranteesProvider,
     private readonly artifacts: ArtifactsProvider,
     private readonly launcher: RuntimeLauncher,
+    private readonly terminals: Terminals,
   ) {
     this.attachContext = vscode.workspace.getConfiguration("omar").get<boolean>("attachDeploymentContext", true);
     this.subscriptions.push(
@@ -195,7 +194,7 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
         break;
       }
       case "attachTerminal":
-        await this.attachTerminal();
+        await this.terminals.attachAssistant();
         break;
       default:
         if (action.startsWith("switchBackend:")) {
@@ -221,37 +220,6 @@ export class ChatView implements vscode.WebviewViewProvider, vscode.Disposable {
     } catch (cause) {
       vscode.window.showErrorMessage(`The runtime refused to restart the assistant: ${cause instanceof Error ? cause.message : String(cause)}`);
     }
-  }
-
-  /**
-   * A terminal on the assistant's own tmux pane, where it runs and prints.
-   *
-   * The session is named by the runtime — `<prefix>ea-<ea>` — and found by
-   * asking tmux, on this extension host, which under Remote SSH is the
-   * machine the assistant is on.
-   */
-  private async attachTerminal(): Promise<void> {
-    const ea = await activeEa(workspaceFiles, dataDir());
-    const sessions = await new Promise<string[]>((resolve) => {
-      execFile("tmux", ["list-sessions", "-F", "#S"], { timeout: 5000 }, (error, stdout) => {
-        resolve(error ? [] : stdout.split("\n").map((line) => line.trim()).filter(Boolean));
-      });
-    });
-    const session = sessions.find((name) => name.endsWith(`ea-${ea}`)) ?? sessions.find((name) => /ea-\d+$/.test(name));
-    if (!session) {
-      vscode.window.showWarningMessage(
-        sessions.length === 0
-          ? "No tmux sessions were found on this machine; the assistant runs in one, so either tmux is not on PATH or no assistant is running."
-          : `No assistant session for EA ${ea} among the tmux sessions: ${sessions.join(", ")}.`,
-      );
-      return;
-    }
-    const terminal = vscode.window.createTerminal({
-      name: `OMAR assistant · ${session}`,
-      shellPath: "tmux",
-      shellArgs: ["attach-session", "-t", session],
-    });
-    terminal.show();
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {

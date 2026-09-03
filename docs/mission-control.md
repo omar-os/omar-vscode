@@ -185,7 +185,12 @@ selects the run. The operator deploys; the assistant never does.
 (`GET /v1/agent`); choosing another restarts the assistant on it
 (`POST /v1/agent/backend`). Terminal opens `tmux attach-session -t
 <prefix>ea-<ea>` in a VS Code terminal, on the extension host, which under
-Remote SSH is where the assistant is.
+Remote SSH is where the assistant is. `src/Terminals.ts` keeps one terminal
+per session and shows the one that is open rather than opening another;
+`src/tmux.ts` names sessions: a run agent's from the deployment record's
+`sessions` map, else by the runtime's own flattening (`first.agent` →
+`…-first_agent`) among what tmux lists. A double-click on a reaction in the
+live topology asks for its agent's pane the same way.
 
 **A delivery that did not take.** The daemon pastes a message into the
 assistant's pane and checks that it took; an assistant still starting up

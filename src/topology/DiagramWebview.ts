@@ -50,6 +50,8 @@ export class DiagramWebview implements vscode.Disposable {
     private readonly onDispose?: () => void,
     /** The reader asked for the other picture: `live` or `file`. */
     private readonly onView?: (which: "live" | "file") => void,
+    /** A double-click on a reaction: the reader wants its agent's pane. */
+    private readonly onTerminal?: (agent: string) => void,
   ) {}
 
   get open(): boolean {
@@ -71,7 +73,7 @@ export class DiagramWebview implements vscode.Disposable {
     panel.iconPath = new vscode.ThemeIcon("type-hierarchy");
     panel.webview.html = html(panel.webview, media);
     panel.webview.onDidReceiveMessage(
-      (message: { kind?: string; component?: string; which?: string; nodes?: number; error?: string | null }) => {
+      (message: { kind?: string; component?: string; which?: string; agent?: string; nodes?: number; error?: string | null }) => {
         switch (message.kind) {
           case "ready":
             if (this.last) void panel.webview.postMessage({ kind: "state", state: this.last });
@@ -81,6 +83,9 @@ export class DiagramWebview implements vscode.Disposable {
             break;
           case "view":
             if (message.which === "live" || message.which === "file") this.onView?.(message.which);
+            break;
+          case "terminal":
+            if (typeof message.agent === "string") this.onTerminal?.(message.agent);
             break;
           case "drawn":
             this.drawn = { nodes: message.nodes ?? 0, error: message.error ?? null };

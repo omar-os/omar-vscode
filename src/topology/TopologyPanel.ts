@@ -43,6 +43,8 @@ export class TopologyPanel implements vscode.Disposable {
     private readonly session: RuntimeSession,
     private readonly selection: Selection,
     private readonly daemonUrl: () => string | null,
+    /** A double-click on a reaction in the live picture: attach to its agent's pane. */
+    private readonly onTerminal: (agent: string) => void,
   ) {
     this.view = new DiagramWebview(
       extensionUri,
@@ -60,6 +62,7 @@ export class TopologyPanel implements vscode.Disposable {
         this.mode = which === "file" ? "file" : "auto";
         this.post();
       },
+      (agent) => this.onTerminal(agent),
     );
     this.subscriptions.push(
       session.onDidChange((state) => {
