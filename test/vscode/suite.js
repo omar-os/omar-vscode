@@ -140,6 +140,20 @@ async function run() {
     await until(() => session.current.live?.connection === "live", "run-1 to be live again");
     await vscode.commands.executeCommand("omar.inspect", null);
 
+    // The per-file diagram is compiled by the connected daemon, so nothing
+    // needs to be installed beside the editor.
+    {
+      const document = await vscode.workspace.openTextDocument({ language: "omar", content: "team T {}" });
+      await vscode.window.showTextDocument(document);
+      await vscode.commands.executeCommand("omar.showDiagram");
+      await until(() => api.diagrams.stateOf(document.uri)?.snapshot, "the file diagram to be drawn by the daemon");
+      const drawn = api.diagrams.stateOf(document.uri);
+      assert.equal(drawn.connection, "compiled");
+      assert.equal(drawn.status, "compiled by daemon");
+      assert.equal(drawn.snapshot.team, "program");
+      await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    }
+
     // Capabilities are found out, not assumed: the daemon answers, so a run
     // can be started; the CLI is not asked for here, so stopping is not offered.
     await until(() => session.current.capabilities.run, "capabilities to be discovered: " + JSON.stringify(session.current.capabilities) + " reach=" + session.current.reach);
