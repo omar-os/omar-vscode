@@ -15,10 +15,17 @@ type Row = { label: string; value: string; icon?: vscode.ThemeIcon; tooltip?: st
  * no row.
  */
 export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Disposable {
-  private readonly changed = new vscode.EventEmitter<void>();
+  private readonly changed = new vscode.EventEmitter<Row | undefined>();
   readonly onDidChangeTreeData = this.changed.event;
   private readonly subscription: vscode.Disposable;
   private readonly ticker: NodeJS.Timeout;
+
+  /**
+   * One object per row, kept across refreshes, so the tree can be told which
+   * row changed. A refresh of the whole tree redraws every row, and doing
+   * that once a second for the clock made the view flicker.
+   */
+  private readonly rows = new Map<string, Row>();
 
   constructor(
     private readonly session: RuntimeSession,
@@ -26,13 +33,27 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
     private readonly guarantees: GuaranteesProvider,
   ) {
     this.subscription = vscode.Disposable.from(
-      session.onDidChange(() => this.changed.fire()),
-      artifacts.onDidChangeTreeData(() => this.changed.fire()),
+      session.onDidChange(() => this.changed.fire(undefined)),
+      artifacts.onDidChangeTreeData(() => this.changed.fire(undefined)),
     );
     this.ticker = setInterval(() => {
       const run = session.selectedRun;
-      if (run && !run.finished_at) this.changed.fire();
+      const elapsed = this.rows.get("Elapsed");
+      if (run && !run.finished_at && elapsed) {
+        elapsed.value = formatElapsed(elapsedOf(run, Date.now() / 1000));
+        this.changed.fire(elapsed);
+      }
     }, 1000);
+  }
+
+  private row(row: Row): Row {
+    const kept = this.rows.get(row.label);
+    if (kept) {
+      Object.assign(kept, row);
+      return kept;
+    }
+    this.rows.set(row.label, row);
+    return row;
   }
 
   getTreeItem(row: Row): vscode.TreeItem {
@@ -81,7 +102,7 @@ export class SummaryProvider implements vscode.TreeDataProvider<Row>, vscode.Dis
     }
     const guarantees = this.guarantees.summary();
     if (guarantees) rows.push({ label: "Guarantees", value: guarantees, icon: new vscode.ThemeIcon("shield") });
-    return rows;
+    return rows.map((row) => this.row(row));
   }
 
   dispose(): void {

@@ -182,48 +182,43 @@
       "view/title": [
         {
           "command": "omar.openAssistant",
-          "when": "view == omar.deployments",
+          "when": "view == omar.summary",
           "group": "navigation@0"
         },
         {
           "command": "omar.openTopology",
-          "when": "view == omar.deployments",
-          "group": "navigation@0"
-        },
-        {
-          "command": "omar.refresh",
-          "when": "view == omar.deployments && omar.reach != 'disconnected'",
+          "when": "view == omar.summary",
           "group": "navigation@1"
         },
         {
-          "command": "omar.connect",
-          "when": "view == omar.deployments",
+          "command": "omar.selectDeployment",
+          "when": "view == omar.summary && omar.reach == 'connected'",
           "group": "navigation@2"
         },
         {
-          "command": "omar.disconnect",
-          "when": "view == omar.deployments && omar.reach != 'disconnected'",
+          "command": "omar.runProgram",
+          "when": "view == omar.summary && omar.canRun",
           "group": "navigation@3"
-        },
-        {
-          "command": "omar.revealArtifacts",
-          "when": "view == omar.artifacts && omar.hasSelection",
-          "group": "navigation"
-        },
-        {
-          "command": "omar.clearHighlight",
-          "when": "view == omar.guarantees",
-          "group": "navigation"
         },
         {
           "command": "omar.stopDeployment",
           "when": "view == omar.summary && omar.canStop",
-          "group": "navigation@1"
+          "group": "navigation@4"
         },
         {
-          "command": "omar.runProgram",
-          "when": "view == omar.deployments && omar.canRun",
-          "group": "navigation@4"
+          "command": "omar.refresh",
+          "when": "view == omar.summary && omar.reach != 'disconnected'",
+          "group": "navigation@5"
+        },
+        {
+          "command": "omar.connect",
+          "when": "view == omar.summary",
+          "group": "navigation@6"
+        },
+        {
+          "command": "omar.disconnect",
+          "when": "view == omar.summary && omar.reach != 'disconnected'",
+          "group": "navigation@7"
         }
       ],
       "commandPalette": [
@@ -262,18 +257,6 @@
         {
           "command": "omar.deployProposal",
           "when": "false"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "omar.showOnTopology",
-          "when": "view == omar.guarantees && viewItem =~ /^guarantee/",
-          "group": "inline@1"
-        },
-        {
-          "command": "omar.openEvidence",
-          "when": "view == omar.guarantees && viewItem == guarantee.evidence",
-          "group": "inline@2"
         }
       ]
     },
@@ -346,39 +329,8 @@
     "views": {
       "omar": [
         {
-          "id": "omar.deployments",
-          "name": "Deployments",
-          "icon": "media/omar.svg",
-          "contextualTitle": "OMAR"
-        },
-        {
           "id": "omar.summary",
           "name": "Deployment",
-          "icon": "media/omar.svg"
-        },
-        {
-          "id": "omar.teams",
-          "name": "Teams",
-          "icon": "media/omar.svg"
-        },
-        {
-          "id": "omar.inspector",
-          "name": "Inspector",
-          "icon": "media/omar.svg"
-        },
-        {
-          "id": "omar.artifacts",
-          "name": "Artifacts",
-          "icon": "media/omar.svg"
-        },
-        {
-          "id": "omar.guarantees",
-          "name": "Guarantees",
-          "icon": "media/omar.svg"
-        },
-        {
-          "id": "omar.events",
-          "name": "Events",
           "icon": "media/omar.svg"
         }
       ],
@@ -393,59 +345,29 @@
     },
     "viewsWelcome": [
       {
-        "view": "omar.deployments",
-        "contents": "Not connected to an OMAR runtime.\n[Connect](command:omar.connect)",
+        "view": "omar.summary",
+        "contents": "Not connected to an OMAR runtime.\\n[Connect](command:omar.connect)",
         "when": "omar.reach == 'disconnected'"
       },
       {
-        "view": "omar.deployments",
+        "view": "omar.summary",
         "contents": "Connecting\u2026",
         "when": "omar.reach == 'connecting'"
       },
       {
-        "view": "omar.deployments",
-        "contents": "Starting the runtime\u2026\n[Show runtime log](command:omar.showRuntimeLog)",
+        "view": "omar.summary",
+        "contents": "Starting the runtime\u2026\\n[Show runtime log](command:omar.showRuntimeLog)",
         "when": "omar.reach == 'starting'"
       },
       {
-        "view": "omar.deployments",
-        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\n[Start runtime](command:omar.startRuntime)\n[Show runtime log](command:omar.showRuntimeLog)\n[Change address](command:omar.connect)",
+        "view": "omar.summary",
+        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\\n[Start runtime](command:omar.startRuntime)\\n[Show runtime log](command:omar.showRuntimeLog)\\n[Change address](command:omar.connect)",
         "when": "omar.reach == 'unreachable'"
       },
       {
-        "view": "omar.deployments",
-        "contents": "Connected. The runtime has no deployments yet; it lists the runs it has started since it came up.",
-        "when": "omar.reach == 'connected'"
-      },
-      {
         "view": "omar.summary",
-        "contents": "No deployment selected.",
-        "when": "!omar.hasSelection"
-      },
-      {
-        "view": "omar.teams",
-        "contents": "No deployment selected.",
-        "when": "!omar.hasSelection"
-      },
-      {
-        "view": "omar.inspector",
-        "contents": "Click an agent, reaction, port or team in the topology or the Teams view to inspect it.",
-        "when": "!omar.inspecting"
-      },
-      {
-        "view": "omar.artifacts",
-        "contents": "No deployment selected.",
-        "when": "!omar.hasSelection"
-      },
-      {
-        "view": "omar.guarantees",
-        "contents": "No deployment selected.",
-        "when": "!omar.hasSelection"
-      },
-      {
-        "view": "omar.events",
-        "contents": "No deployment selected.",
-        "when": "!omar.hasSelection"
+        "contents": "Connected. The runtime has no deployments yet; run an .omar program, or ask the assistant for one.\\n[Open Assistant](command:omar.openAssistant)",
+        "when": "omar.reach == 'connected' && !omar.hasSelection"
       }
     ]
   },

@@ -1,6 +1,8 @@
 import { StrictMode, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { createRoot } from "react-dom/client";
 
+import { Boundary } from "./boundary";
+
 import { ChatMessage } from "../vendor/omar/web/app/chat-message";
 import type { ChatMessage as ChatMessageModel } from "../vendor/omar/web/app/lib/protocol";
 
@@ -47,18 +49,20 @@ type Outgoing =
   | { kind: "action"; action: string }
   | { kind: "rendered"; messages: number };
 
-const vscode = acquireVsCodeApi<State>();
+const vscode = acquireVsCodeApi();
 const post = (message: Outgoing) => vscode.postMessage(message);
 
 function App() {
-  const [state, setState] = useState<State | null>(() => vscode.getState() ?? null);
+  // Not restored from what VS Code persisted: a page from an older build
+  // would restore an older shape, and the extension posts the whole state
+  // as soon as the page says it is ready.
+  const [state, setState] = useState<State | null>(null);
   const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<{ kind?: string; state?: State }>) => {
       if (event.data?.kind === "state" && event.data.state) {
-        vscode.setState(event.data.state);
         setState(event.data.state);
       }
     };
@@ -189,6 +193,8 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Boundary>
+      <App />
+    </Boundary>
   </StrictMode>,
 );

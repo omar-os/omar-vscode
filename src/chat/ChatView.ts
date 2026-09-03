@@ -337,6 +337,8 @@ function html(webview: vscode.Webview, media: vscode.Uri): string {
       content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} data:;" />
 <link rel="stylesheet" href="${style}" />
 <style nonce="${nonce}">
+  .page-error { padding: 16px; color: #fecaca; font: 12px ui-sans-serif, system-ui, sans-serif; }
+  .page-error pre { white-space: pre-wrap; color: #f5f2fa; }
   html, body, #root { height: 100%; margin: 0; }
   body { background: var(--ink); color: var(--text); font: 12px ui-sans-serif, system-ui, sans-serif; overflow: hidden; }
   #root { display: flex; flex-direction: column; }

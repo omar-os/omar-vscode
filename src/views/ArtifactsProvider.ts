@@ -75,9 +75,13 @@ export class ArtifactsProvider implements vscode.TreeDataProvider<ArtifactNode>,
     const generation = ++this.generation;
     const listing = await listArtifacts(workspaceFiles, dataDir(), run, state.live?.snapshot ?? null);
     if (generation !== this.generation || this.session.selectedRun?.run_id !== run.run_id) return;
+    // Listed every few seconds while a run is live; only a listing that
+    // differs is worth telling anyone about, or every view reading this
+    // redraws on the clock.
+    const same = this.listing !== null && JSON.stringify(this.listing) === JSON.stringify(listing);
     this.listing = listing;
     this.watch(listing.directory);
-    this.changed.fire();
+    if (!same) this.changed.fire();
   }
 
   private watch(directory: string | null): void {
