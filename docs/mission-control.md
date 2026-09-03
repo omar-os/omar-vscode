@@ -86,6 +86,15 @@ To move to a newer web diagram: `git -C vendor/omar checkout <commit>`,
 `npm run build`, and commit the submodule pointer. Clone with
 `--recurse-submodules`, or run `git submodule update --init`.
 
+## Views
+
+The sidebar holds one view for now, **Deployment** (`SummaryProvider`); the
+providers for Deployments, Teams, Inspector, Artifacts, Guarantees and Events
+remain in `src/views/` unregistered, and the artifact and guarantee readers
+feed the summary, the topology and the assistant's context. The summary
+keeps one object per row and refreshes only the Elapsed row on its clock;
+a whole-tree refresh every second redrew every row and flickered.
+
 ## Artifacts (`src/artifacts/`)
 
 The daemon serves none of a run's files. It writes them under its data

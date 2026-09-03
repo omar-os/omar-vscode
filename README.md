@@ -8,27 +8,26 @@ compilation, and a live, inspectable picture of what a deployment is doing.
 
 ## Mission Control
 
-Open the OMAR activity bar with an `omar serve` daemon running and you see
-what it is running:
+Open the OMAR activity bar and you see what the runtime is running. The
+sidebar holds one view for now, **Deployment**; the topology and the
+assistant have panels of their own.
 
 - **Assistant** (in the panel, next to the terminal; `OMAR: Open Assistant`)
   — the thread with the executive assistant, the same one the web Mission
-  Control talks to. Its header names the backend the assistant runs on and
-  lets you move it to another (which restarts it), and **Terminal** opens
-  the assistant's own tmux pane in a VS Code terminal. Ask for a workflow and it proposes a complete
-  program the daemon has compiled; preview it in the diagram panel, open its
+  Control talks to. Ask for a workflow and it proposes a complete program
+  the daemon has compiled; preview it in the Topology panel, open its
   source, deploy it. Ask about the selected deployment and the message
   carries the runtime's own account of it — each reaction's state, the port
   values, the last events, the guarantees, where the files are — because
-  the runtime gives the assistant no other way to see a run. The component
-  you are inspecting goes along as the selection, so "this one" resolves.
-- **Deployments** — every run the daemon has started, its status and elapsed
-  time. The newest is selected on its own; a run you start is selected as it
+  the runtime gives the assistant no other way to see a run. The header
+  names the backend the assistant runs on and lets you move it to another
+  (which restarts it); **Terminal** opens the assistant's own tmux pane.
+- **Deployment** — the selected run: status, team, revision, timing, the
+  counts, logical time, lag, the guarantees at a glance, and whether the
+  picture is **LIVE**, **STALE** (the event stream broke; what is shown is
+  what was last known) or **FINAL**. `OMAR: Select Deployment` picks another;
+  the newest is selected on its own, and a run you start is selected as it
   starts.
-- **Deployment** — status, team, revision, timing, the counts, logical time,
-  lag, guarantees at a glance, and whether the picture is **LIVE**, **STALE**
-  (the event stream broke; what is shown is what was last known) or
-  **FINAL**.
 - **Topology** panel (`OMAR: Open Topology`, or the diagram button on an
   `.omar` editor) — one picture, drawn by the very component the web
   Mission Control draws with (vendored from the omar repository and bundled
@@ -36,22 +35,11 @@ what it is running:
   as chevrons, timers as clocks. It shows the compiled picture of the
   `.omar` file you are editing, redrawn on save, and switches itself to the
   live picture when the selected deployment goes live; a Live / file toggle
-  in its header brings either back. Pan, zoom, click anything to inspect it.
-- **Teams** — instances, their agents, and each agent's reactions with their
-  real states.
-- **Inspector** — what the runtime knows about the selected thing: a
-  reaction's status, agent, triggers and effects with their values; a port's
-  value and when it was written; a guarantee's status, mechanism and evidence.
-- **Guarantees** — what holds for this run, with the status kept exact:
-  **ENFORCED** (the runtime prevents violation), **MONITORED** (it detects and
-  reports), **UNCHECKED** (nothing establishes it). Nothing is marked
-  **PROVEN**, because nothing is. *Show on topology* brings a guarantee's
-  subjects forward.
-- **Artifacts** — what the run wrote: the program as submitted, outputs,
-  state, each agent's log and instructions. Each opens as an ordinary VS Code
-  document.
-- **Events** — every event the follower applied, newest first, with notes
-  where the stream broke.
+  in its header brings either back. Pan, zoom, click anything to select it.
+
+The Teams, Inspector, Artifacts, Guarantees and Events views are out of the
+sidebar for now; what they read still feeds the summary, the topology and
+the assistant's context.
 
 Controls are the runtime's own: **Run Program** starts the open `.omar` file
 through the daemon (asking for each open input); **Stop** goes through the

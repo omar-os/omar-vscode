@@ -1,6 +1,8 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
+import { Boundary } from "./boundary";
+
 import { DiagramCanvas } from "../vendor/omar/web/app/diagram/diagram-canvas";
 import type { DiagramSnapshot } from "../vendor/omar/web/app/lib/protocol";
 
@@ -39,20 +41,22 @@ type Outgoing =
   | { kind: "view"; which: "live" | "file" }
   | { kind: "drawn"; nodes: number; error: string | null };
 
-const vscode = acquireVsCodeApi<State>();
+const vscode = acquireVsCodeApi();
 
 function post(message: Outgoing): void {
   vscode.postMessage(message);
 }
 
 function App() {
-  const [state, setState] = useState<State | null>(() => vscode.getState() ?? null);
+  // Not restored from what VS Code persisted: a page from an older build
+  // would restore an older shape, and the extension posts the whole state
+  // as soon as the page says it is ready.
+  const [state, setState] = useState<State | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<{ kind?: string; state?: State }>) => {
       if (event.data?.kind === "state" && event.data.state) {
-        vscode.setState(event.data.state);
         setState(event.data.state);
       }
     };
@@ -129,6 +133,8 @@ function App() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <Boundary>
+      <App />
+    </Boundary>
   </StrictMode>,
 );

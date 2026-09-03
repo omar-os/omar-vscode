@@ -6,11 +6,9 @@ import { RuntimeSession } from "./runtime/RuntimeSession";
 import { RuntimeLauncher } from "./runtime/RuntimeLauncher";
 import { isRunFinished } from "./client/protocol";
 import { normalizeRuntimeUrl } from "./client/OmarClient";
-import { DeploymentsProvider } from "./views/DeploymentsProvider";
 import { SummaryProvider } from "./views/SummaryProvider";
-import { TeamsProvider } from "./views/TeamsProvider";
 import { StatusBar } from "./views/StatusBar";
-import { InspectorProvider, Selection } from "./views/Inspector";
+import { Selection } from "./views/Inspector";
 import { TopologyPanel } from "./topology/TopologyPanel";
 import { OutlineProvider } from "./language/OutlineProvider";
 import type { Guarantee } from "./model/guarantees";
@@ -19,7 +17,6 @@ import { ChatView } from "./chat/ChatView";
 import { dataDir, workspaceFiles } from "./artifacts/files";
 import { ArtifactsProvider } from "./views/ArtifactsProvider";
 import { GuaranteesProvider } from "./views/GuaranteesProvider";
-import { EventsProvider } from "./views/EventsProvider";
 
 const LANGUAGE = "omar";
 
@@ -110,15 +107,12 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
     cliPath: cliPath(),
     artifactsReadable: (await workspaceFiles.stat(dataDir())) !== null,
   });
-  const deployments = new DeploymentsProvider(session);
+  // Artifacts and guarantees are read here for the summary, the topology and
+  // the assistant; the views that listed them are out of the sidebar for now.
   const artifacts = new ArtifactsProvider(session);
   const guarantees = new GuaranteesProvider(session, artifacts);
   const summary = new SummaryProvider(session, artifacts, guarantees);
-  const teams = new TeamsProvider(session);
-  const events = new EventsProvider(session);
   const selection = new Selection();
-  const inspector = new InspectorProvider(session, selection, guarantees);
-  const inspectorView = vscode.window.createTreeView("omar.inspector", { treeDataProvider: inspector });
   const panel = new TopologyPanel(context.extensionUri, session, selection, daemonUrl);
   const chat = new ChatView(context.extensionUri, session, selection, guarantees, artifacts, launcher);
   context.subscriptions.push(
@@ -167,10 +161,6 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
     }),
     artifacts,
     guarantees,
-    events,
-    vscode.window.registerTreeDataProvider("omar.artifacts", artifacts),
-    vscode.window.registerTreeDataProvider("omar.guarantees", guarantees),
-    vscode.window.registerTreeDataProvider("omar.events", events),
     vscode.commands.registerCommand("omar.showOnTopology", (ids: string[] | Guarantee) => {
       selection.setHighlight(Array.isArray(ids) ? ids : ids.subjects);
       panel.show();
@@ -196,17 +186,11 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
       );
     }),
     session,
-    deployments,
     summary,
-    teams,
     selection,
-    inspector,
-    inspectorView,
     panel,
     new StatusBar(session),
-    vscode.window.registerTreeDataProvider("omar.deployments", deployments),
     vscode.window.registerTreeDataProvider("omar.summary", summary),
-    vscode.window.registerTreeDataProvider("omar.teams", teams),
     session.onDidChange((state) => {
       void vscode.commands.executeCommand("setContext", "omar.reach", state.reach);
       void vscode.commands.executeCommand("setContext", "omar.hasSelection", state.selected !== null);
@@ -217,7 +201,6 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
       if (selection.current && !state.live?.snapshot) selection.set(null);
     }),
     selection.onDidChange(() => {
-      inspectorView.description = inspector.title() ?? undefined;
       void vscode.commands.executeCommand("setContext", "omar.inspecting", selection.current !== null);
     }),
     vscode.commands.registerCommand("omar.openTopology", () => panel.show()),
