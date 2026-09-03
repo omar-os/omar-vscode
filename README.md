@@ -55,6 +55,21 @@ the runtime has no such operation. Nothing is cached across a fetch and
 nothing is invented: the extension shows what the runtime says, and says what
 it does not know.
 
+### Install
+
+Build the extension package and install it into VS Code:
+
+```bash
+git clone --recurse-submodules git@github.com:omar-os/omar-vscode.git
+cd omar-vscode
+npm install
+npm run package                                   # writes omar-vscode-<version>.vsix
+code --install-extension omar-vscode-*.vsix       # or: Extensions view › … › Install from VSIX
+```
+
+Every CI run on `main` also attaches the `.vsix` as a workflow artifact. To
+develop instead, open the folder in VS Code and press <kbd>F5</kbd>.
+
 ### Try it
 
 Install `omar` (`brew install omar-os/omar/omar`, or the install script in
