@@ -84,6 +84,8 @@ export class RuntimeSession implements vscode.Disposable {
     this.serve = client;
     this.set({ url: client.url, reach: "connecting", problem: null, runs: [], selected: null, live: null, mode: "daemon", capabilities: NONE });
     await this.refresh();
+    // A connect is asked for; the backoff is for the poll, not for this.
+    this.lastLaunch = 0;
     if (this.state.reach === "unreachable" && this.serve === client) await this.launch("nothing answered on connect");
     if (this.serve === client) this.poll = setInterval(() => void this.refresh(), POLL_MS);
   }
