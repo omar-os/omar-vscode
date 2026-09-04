@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import test, { describe } from "node:test";
 
 import { serveSpec, startServe, waitFor } from "../out/runtime/serve.js";
+import { installCommandFor, isMissingBinary } from "../out/runtime/install.js";
 
 const FAKE = new URL("./fixtures/fake-omar", import.meta.url).pathname;
 
@@ -56,5 +57,18 @@ describe("starting the runtime", () => {
 
   test("waitFor gives up when nothing answers", async () => {
     assert.equal(await waitFor(async () => { throw new Error("down"); }, 300, 50), false);
+  });
+});
+
+describe("installing the runtime", () => {
+  test("the installer goes where it goes", () => {
+    assert.match(installCommandFor("darwin"), /curl -fsSL https:\/\/omar\.rs\/install\.sh \| sh/);
+    assert.equal(installCommandFor("linux"), installCommandFor("darwin"));
+    assert.equal(installCommandFor("win32"), null);
+  });
+
+  test("a missing binary is told from one that would not run", () => {
+    assert.equal(isMissingBinary("error: spawn omar ENOENT"), true);
+    assert.equal(isMissingBinary("code 1"), false);
   });
 });

@@ -140,6 +140,7 @@ function activateMissionControl(context: vscode.ExtensionContext, daemonUrl: () 
       void session.refresh();
     }),
     vscode.commands.registerCommand("omar.showRuntimeLog", () => launcher.showLog()),
+    vscode.commands.registerCommand("omar.installRuntime", () => launcher.install()),
     chat,
     vscode.window.registerWebviewViewProvider(ChatView.viewType, chat, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand("omar.openAssistant", () => vscode.commands.executeCommand("omar.chat.focus")),

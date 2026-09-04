@@ -217,6 +217,12 @@ async function run() {
     await vscode.commands.executeCommand("omar.stopRuntime");
     await until(() => !launcher.running, "the started runtime to stop");
     await until(() => session.current.reach !== "connected", "the session to notice the runtime is gone", 15_000);
+    // No omar at all: the launcher says so and offers the installer, and
+    // never pretends a runtime is coming.
+    await configuration.update("cliPath", "/nonexistent/omar", vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand("omar.connect", `http://127.0.0.1:${free}`);
+    await until(() => launcher.missing, "the missing binary to be noticed", 30_000);
+    assert.equal(session.current.reach, "unreachable");
     await configuration.update("autoStartRuntime", false, vscode.ConfigurationTarget.Global);
     await configuration.update("cliPath", undefined, vscode.ConfigurationTarget.Global);
 

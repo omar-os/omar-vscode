@@ -164,6 +164,10 @@
         "command": "omar.openAssistant",
         "title": "OMAR: Open Assistant",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "omar.installRuntime",
+        "title": "OMAR: Install the Runtime (omar)"
       }
     ],
     "menus": {
@@ -361,7 +365,7 @@
       },
       {
         "view": "omar.summary",
-        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here.\n[Start runtime](command:omar.startRuntime)\n[Show runtime log](command:omar.showRuntimeLog)\n[Change address](command:omar.connect)",
+        "contents": "Nothing is answering at `omar.runtimeUrl`, and the runtime could not be started here. If `omar` is not installed on this machine, the installer runs in a terminal where you can watch it.\n[Install omar](command:omar.installRuntime)\n[Start runtime](command:omar.startRuntime)\n[Show runtime log](command:omar.showRuntimeLog)\n[Change address](command:omar.connect)",
         "when": "omar.reach == 'unreachable'"
       },
       {
