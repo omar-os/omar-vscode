@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { ServeClient } from "../client/OmarClient";
+import { installCommandFor, isMissingBinary } from "./install";
 import { serveSpec, startServe, waitFor, type ServeHandle } from "./serve";
 
 /**
@@ -23,6 +24,9 @@ export class RuntimeLauncher implements vscode.Disposable {
    * whoever asks later rather than only announced.
    */
   assistantWarning: string | null = null;
+  /** True once a start failed because there is no `omar` to run. */
+  missing = false;
+  private offering = false;
   private handle: ServeHandle | null = null;
   private startedFor: string | null = null;
 
@@ -76,18 +80,63 @@ export class RuntimeLauncher implements vscode.Disposable {
     ]);
     if (!up) {
       this.handle = null;
-      const choice = await vscode.window.showWarningMessage(
-        "OMAR could not start its runtime. Is `omar` installed and on PATH, or set in omar.cliPath?",
-        "Show log",
-      );
-      if (choice === "Show log") this.log.show(true);
+      const how = await handle.exited;
+      if (isMissingBinary(how)) {
+        this.missing = true;
+        void this.offerInstall(spec.cliPath);
+      } else {
+        const choice = await vscode.window.showWarningMessage(
+          "OMAR could not start its runtime. See the log for what it said.",
+          "Show log",
+        );
+        if (choice === "Show log") this.log.show(true);
+      }
       return false;
     }
+    this.missing = false;
     void handle.exited.then((how) => {
       if (this.handle === handle) this.handle = null;
       this.log.appendLine(`[${new Date().toISOString()}] the runtime stopped (${how})`);
     });
     return true;
+  }
+
+  /**
+   * There is no `omar` to run: say so, once, and offer the runtime's own
+   * installer in a terminal. The poll tries the runtime again on its own
+   * once the binary is there.
+   */
+  private async offerInstall(cliPath: string): Promise<void> {
+    if (this.offering) return;
+    this.offering = true;
+    try {
+      const command = installCommandFor(process.platform);
+      const where = cliPath === "omar" ? "on PATH" : `at ${cliPath}`;
+      const choice = await vscode.window.showWarningMessage(
+        `OMAR is not installed on this machine: there is no \`omar\` ${where}. Install it, or point omar.cliPath at it.`,
+        ...(command ? ["Install omar"] : []),
+        "Set omar.cliPath",
+        "Show log",
+      );
+      if (choice === "Install omar") this.install();
+      else if (choice === "Set omar.cliPath") void vscode.commands.executeCommand("workbench.action.openSettings", "omar.cliPath");
+      else if (choice === "Show log") this.log.show(true);
+    } finally {
+      this.offering = false;
+    }
+  }
+
+  /** Run the installer where the operator can see it. */
+  install(): void {
+    const command = installCommandFor(process.platform);
+    if (!command) {
+      vscode.window.showWarningMessage(`The OMAR installer supports macOS and Linux; on ${process.platform} install omar by hand and set omar.cliPath.`);
+      return;
+    }
+    const terminal = vscode.window.createTerminal({ name: "Install OMAR" });
+    terminal.show();
+    terminal.sendText(`${command}  # installs omar and omarc to /usr/local/bin; the OMAR view retries the runtime on its own once it is there`, true);
+    this.log.appendLine(`[${new Date().toISOString()}] installer started in a terminal: ${command}`);
   }
 
   stop(): void {

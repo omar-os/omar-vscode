@@ -220,7 +220,12 @@ that will not start is not started in a loop. A daemon that was already
 answering is never touched, and only one the extension started is stopped —
 on `OMAR: Stop Runtime`, on deactivation, and when the host process exits.
 Not loopback, or `omar.autoStartRuntime` off: nothing is started and the
-view says what to do.
+view says what to do. A spawn that fails with ENOENT means there is no
+`omar` to run; the launcher says so once and offers the runtime's own
+installer (`src/runtime/install.ts`) in a VS Code terminal on the
+extension host — macOS and Linux; elsewhere it says to install by hand —
+and the poll's next launch attempt finds the binary once it is there. The
+extension carries no binaries itself.
 
 ## Operator controls and capabilities
 

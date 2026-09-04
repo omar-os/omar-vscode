@@ -68,11 +68,14 @@ develop instead, open the folder in VS Code and press <kbd>F5</kbd>.
 
 ### Try it
 
-Install `omar` (`brew install omar-os/omar/omar`, or the install script in
-its README) so it is on `PATH`, together with `omarc`. Open the OMAR
-activity bar: when nothing answers at `omar.runtimeUrl` the extension starts
-`omar serve` itself, as a child that stops with the window, and connects
-once it answers. Its output is in the **OMAR Runtime** output channel. A
+Open the OMAR activity bar. When nothing answers at `omar.runtimeUrl` the
+extension starts `omar serve` itself, as a child that stops with the
+window, and connects once it answers. If `omar` is not installed on the
+machine the extension host runs on, it says so and offers to run the
+runtime's installer (`curl -fsSL https://omar.rs/install.sh | sh`, macOS
+and Linux) in a terminal where you can watch it; the extension retries the
+runtime on its own once the binary is there. `brew install
+omar-os/omar/omar` works too. Its output is in the **OMAR Runtime** output channel. A
 daemon that was already running is used as it is and left alone.
 
 The runtime the extension starts brings the assistant with it (on whatever
